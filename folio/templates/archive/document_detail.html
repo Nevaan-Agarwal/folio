@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Document Detail - {{ t('app.name') }}{% endblock %}
+{% block page_title %}Document Detail{% endblock %}
+
+{% block head_extra %}
+<style>
+  .doc-breadcrumb { color: var(--text-secondary); font-size: 13px; margin-bottom: 12px; }
+  .doc-layout { display:grid; grid-template-columns: 30% 40% 30%; gap:14px; }
+  .doc-receipt-img { width:100%; max-height:400px; object-fit:contain; background:var(--bg-primary); border:1px solid var(--border-default); border-radius:var(--radius-xl); }
+  .doc-ocr-toggle { margin-top:10px; }
+  .doc-ocr-text { margin-top:8px; max-height:220px; overflow-y:auto; background:var(--bg-primary); border:1px solid var(--border-default); border-radius:var(--radius-md); padding:10px; font-family:var(--font-mono); font-size:12px; color:var(--success); white-space:pre-wrap; }
+  .doc-section { margin-bottom:14px; }
+  .doc-label { color:var(--text-secondary); font-size:11px; text-transform:uppercase; letter-spacing:.11em; margin:0 0 4px; }
+  .doc-value { color:var(--text-primary); font-weight:500; margin:0; }
+  .doc-fields-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .doc-actions-card { background:var(--bg-surface); border:1px solid var(--border-default); border-radius:var(--radius-xl); padding:20px; }
+  .timeline { margin:0; padding:0; list-style:none; display:grid; gap:10px; }
+  .timeline-item { display:grid; grid-template-columns:18px 1fr; gap:8px; align-items:start; }
+  .timeline-dot { width:10px; height:10px; border-radius:50%; margin-top:4px; background:var(--success); }
+  .timeline-dot.current { background:var(--warning); box-shadow:0 0 0 0 rgba(245,166,35,.55); animation:pulse-dot 1.2s infinite; }
+  .timeline-time { color:var(--text-muted); font-size:12px; margin:0 0 2px; }
+  .timeline-action { margin:0; color:var(--text-primary); font-size:13px; }
+  .doc-info-mono { font-family:var(--font-mono); color:var(--text-muted); font-size:12px; }
+  .doc-actions-stack { display:grid; gap:8px; margin-top:10px; }
+  .email-badge { display:inline-flex; padding:6px 10px; border-radius:999px; font-size:12px; border:1px solid transparent; }
+  .email-sent { color:var(--success); background:var(--success-muted); border-color:rgba(45,212,160,.35); }
+  .email-failed { color:var(--error); background:var(--error-muted); border-color:rgba(255,92,92,.35); }
+  .email-pending { color:var(--warning); background:var(--accent-muted); border-color:rgba(245,166,35,.35); }
+  .doc-delete-link { background:none; border:0; color:var(--error); padding:0; margin-top:12px; font-size:13px; cursor:pointer; }
+  .resend-loading { opacity:.7; pointer-events:none; }
+  @keyframes pulse-dot { 0%{box-shadow:0 0 0 0 rgba(245,166,35,.55);} 70%{box-shadow:0 0 0 10px rgba(245,166,35,0);} 100%{box-shadow:0 0 0 0 rgba(245,166,35,0);} }
+  @media (max-width: 1100px) { .doc-layout { grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<p class="doc-breadcrumb">
+  <a href="{{ url_for('archive.employee_archive') }}">Archive</a> → {{ form.merchant or receipt.merchant }} {{ form.date or form.dateOfHospitality or '' }}
+</p>
+
+<section class="doc-layout">
+  <article class="card">
+    <img class="doc-receipt-img" src="{{ receipt.imageUrl }}" alt="Original receipt" />
+    <div class="confidence-wrap" style="margin-top:10px;">
+      <svg class="confidence-ring" viewBox="0 0 120 120">
+        <circle class="confidence-ring-bg" cx="60" cy="60" r="52"></circle>
+        <circle class="confidence-ring-fill" cx="60" cy="60" r="52"></circle>
+      </svg>
+      <div>
+        <p class="confidence-value">{{ (receipt.ocrConfidence or 0)|round|int }}%</p>
+        <p class="settings-note">OCR Confidence</p>
+      </div>
+    </div>
+    <button type="button" id="toggleOcrText" class="btn-secondary doc-ocr-toggle">View OCR Text ▾</button>
+    <pre id="ocrTextBlock" class="doc-ocr-text" hidden>{{ receipt.ocrText }}</pre>
+    <p class="settings-note" style="margin-top:8px;">Uploaded: {{ receipt.uploadedAt or '-' }}</p>
+  </article>
+
+  <article class="card">
+    <div class="section-header"><p>Basic Information</p></div>
+    <div class="doc-fields-grid doc-section">
+      <div><p class="doc-label">Type</p><p class="doc-value">{{ form.type or '-' }}</p></div>
+      <div><p class="doc-label">Category</p><p class="doc-value">{{ form.expenseCategory or '-' }}</p></div>
+      <div><p class="doc-label">Receipt Number</p><p class="doc-value">{{ form.receiptNumber or '-' }}</p></div>
+      <div><p class="doc-label">Merchant</p><p class="doc-value">{{ form.merchant or receipt.merchant or '-' }}</p></div>
+    </div>
+
+    <div class="section-header"><p>Bewirtungsdetails / Hospitality Details</p></div>
+    <div class="doc-fields-grid doc-section">
+      <div><p class="doc-label">Tag der Bewirtung / Date</p><p class="doc-value">{{ form.dateOfHospitality or '-' }}</p></div>
+      <div><p class="doc-label">Ort der Bewirtung / Location</p><p class="doc-value">{{ form.locationOfHospitality or '-' }}</p></div>
+      <div><p class="doc-label">Bewirtende Person / Host</p><p class="doc-value">{{ form.host or '-' }}</p></div>
+      <div><p class="doc-label">Anlass der Bewirtung / Occasion</p><p class="doc-value">{{ form.occasion or '-' }}</p></div>
+    </div>
+    <div class="doc-section">
+      <p class="doc-label">Bewirtete Personen / Guests</p>
+      <p class="doc-value">{{ (form.hostedPersons or [])|join(', ') or '-' }}</p>
+    </div>
+
+    <div class="section-header"><p>Financial</p></div>
+    <div class="doc-fields-grid doc-section">
+      <div><p class="doc-label">Invoice Amount</p><p class="doc-value">EUR {{ "%.2f"|format(form.invoiceAmount or 0) }}</p></div>
+      <div><p class="doc-label">Tip</p><p class="doc-value">EUR {{ "%.2f"|format(form.tip or 0) }}</p></div>
+      <div><p class="doc-label">Total Amount</p><p class="doc-value">EUR {{ "%.2f"|format(form.totalAmount or 0) }}</p></div>
+      <div><p class="doc-label">Place</p><p class="doc-value">{{ form.place or '-' }}</p></div>
+    </div>
+  </article>
+
+  <aside class="doc-actions-card">
+    <p class="doc-label">Status Timeline</p>
+    <ul class="timeline">
+      {% for item in timeline %}
+      <li class="timeline-item">
+        <span class="timeline-dot {% if item.isCurrent %}current{% endif %}"></span>
+        <div>
+          <p class="timeline-time">{{ item.timestamp or '-' }}</p>
+          <p class="timeline-action">{{ item.action }}</p>
+        </div>
+      </li>
+      {% endfor %}
+      {% if not timeline %}
+      <li class="timeline-item"><span class="timeline-dot current"></span><p class="timeline-action">No audit events</p></li>
+      {% endif %}
+    </ul>
+
+    <p class="doc-label" style="margin-top:14px;">Document Info</p>
+    <p class="doc-info-mono">{{ document.id }}</p>
+    <p class="settings-note">Created: {{ document.createdAt or '-' }}</p>
+
+    <div class="doc-actions-stack">
+      <a class="btn-primary" href="{{ document.downloadUrl }}" download>Download PDF</a>
+      <a class="btn-secondary" href="{{ document.downloadUrl }}" target="_blank" rel="noopener">Preview PDF</a>
+    </div>
+
+    <p class="doc-label" style="margin-top:14px;">Email Delivery Status</p>
+    {% if document.emailDeliveryStatus == "sent" %}
+    <span class="email-badge email-sent">Sent to {{ document.userEmail or 'user email' }}</span>
+    <p class="settings-note">Sent at {{ document.emailSentAt or '-' }}</p>
+    {% elif document.emailDeliveryStatus == "failed" %}
+    <span class="email-badge email-failed">Delivery failed</span>
+    {% else %}
+    <span class="email-badge email-pending">Delivery pending...</span>
+    {% endif %}
+
+    {% if document.emailSent or document.emailDeliveryStatus == "failed" %}
+    <button id="resendEmailBtn" type="button" class="btn-danger" style="width:100%; margin-top:8px;">Resend Email</button>
+    {% endif %}
+
+    {% if can_delete %}
+    <button id="deleteSubmissionBtn" type="button" class="doc-delete-link">Delete Submission</button>
+    {% endif %}
+  </aside>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const toggle = document.getElementById("toggleOcrText");
+    const ocr = document.getElementById("ocrTextBlock");
+    if (toggle && ocr) {
+      toggle.addEventListener("click", function () {
+        ocr.hidden = !ocr.hidden;
+        toggle.textContent = ocr.hidden ? "View OCR Text ▾" : "View OCR Text ▴";
+      });
+    }
+
+    const resendBtn = document.getElementById("resendEmailBtn");
+    if (resendBtn) {
+      resendBtn.addEventListener("click", async function () {
+        resendBtn.classList.add("resend-loading");
+        resendBtn.textContent = "Sending...";
+        try {
+          const response = await fetch("/documents/{{ document.id }}/resend-email", { method: "POST", headers: { Accept: "application/json" } });
+          if (response.ok) {
+            window.location.reload();
+          } else {
+            resendBtn.textContent = "Resend Email";
+            resendBtn.classList.remove("resend-loading");
+          }
+        } catch (_error) {
+          resendBtn.textContent = "Resend Email";
+          resendBtn.classList.remove("resend-loading");
+        }
+      });
+    }
+
+    const deleteBtn = document.getElementById("deleteSubmissionBtn");
+    if (deleteBtn) {
+      deleteBtn.addEventListener("click", function () {
+        window.alert("Deletion endpoint is not enabled yet.");
+      });
+    }
+  })();
+</script>
+{% endblock %}

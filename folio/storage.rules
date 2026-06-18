@@ -1,0 +1,51 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'admin' ||
+        firestore.get(
+          /databases/(default)/documents/users/$(request.auth.uid)
+        ).data.role == 'admin'
+      );
+    }
+
+    function isImageUpload() {
+      return request.resource != null &&
+        request.resource.contentType.matches('image/.*');
+    }
+
+    function isUnderReceiptSizeLimit() {
+      return request.resource != null &&
+        request.resource.size < 15 * 1024 * 1024;
+    }
+
+    match /receipts/{userId}/{receiptId}/{filename} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) &&
+        isImageUpload() &&
+        isUnderReceiptSizeLimit();
+      allow delete: if false;
+    }
+
+    // Current Folio path style.
+    match /combined_documents/{userId}/{docId}/{filename} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write, delete: if false;
+    }
+
+    // Alias path style.
+    match /combinedDocuments/{userId}/{docId}/{filename} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write, delete: if false;
+    }
+  }
+}

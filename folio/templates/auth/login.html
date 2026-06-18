@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% set standalone_auth = true %}
+
+{% block title %}{{ t('auth.login') }} - {{ t('app.name') }}{% endblock %}
+
+{% block auth_content %}
+<section class="register-layout">
+  <aside class="register-brand-panel">
+    <div class="register-brand-content">
+      <h1 class="register-logo">{{ t('app.name') }}</h1>
+      <p class="register-tagline">{{ t('app.tagline') }}</p>
+      <svg class="receipt-illustration" viewBox="0 0 360 220" fill="none" aria-hidden="true">
+        <path d="M70 24h180l40 40v132l-20-8-20 8-20-8-20 8-20-8-20 8-20-8-20 8-20-8V24Z" />
+        <path d="M104 78h130M104 108h130M104 138h94" />
+        <path d="M224 152c18 0 32 14 32 32" />
+      </svg>
+    </div>
+  </aside>
+
+  <main class="register-form-panel">
+    <div class="register-card">
+      <h2>{{ t('auth.login') }}</h2>
+      <p class="register-subtitle">{{ t('app.tagline') }}</p>
+
+      <form id="loginForm" method="post" action="{{ url_for('auth.login') }}" novalidate>
+        <div class="form-grid">
+          <div class="field-group field-group-full">
+            <label for="email">{{ t('auth.email') }}</label>
+            <input class="input-field" id="email" name="email" type="email" required />
+            <p class="field-error" data-error-for="email"></p>
+          </div>
+          <div class="field-group field-group-full">
+            <label for="password">{{ t('auth.password') }}</label>
+            <input class="input-field" id="password" name="password" type="password" required />
+            <p class="field-error" data-error-for="password"></p>
+          </div>
+        </div>
+
+        <div class="auth-login-actions">
+          <label class="remember-me">
+            <input type="checkbox" id="rememberMe" name="rememberMe" />
+            <span>Remember me</span>
+          </label>
+          <a class="forgot-link" href="{{ url_for('auth.forgot_password') }}">{{ t('auth.forgotPassword') }}</a>
+        </div>
+
+        <p class="field-error" data-error-for="form"></p>
+        <button class="btn-primary register-submit login-submit" type="submit" id="loginSubmitBtn">
+          <span class="btn-text">{{ t('auth.login') }}</span>
+          <span class="btn-spinner" aria-hidden="true"></span>
+        </button>
+      </form>
+
+      <p class="auth-alt-link">
+        Don't have an account?
+        <a href="{{ url_for('auth.register_page') }}">{{ t('auth.register') }}</a>
+      </p>
+    </div>
+  </main>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const form = document.getElementById("loginForm");
+    const submitButton = document.getElementById("loginSubmitBtn");
+    if (!form || !submitButton) return;
+
+    function setError(field, message) {
+      const errorEl = document.querySelector('[data-error-for="' + field + '"]');
+      if (errorEl) errorEl.textContent = message || "";
+    }
+
+    function clearErrors() {
+      ["email", "password", "form"].forEach(function (field) {
+        setError(field, "");
+      });
+    }
+
+    function setLoadingState(isLoading) {
+      submitButton.classList.toggle("is-loading", isLoading);
+      submitButton.disabled = isLoading;
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      clearErrors();
+
+      const payload = {
+        email: form.email.value,
+        password: form.password.value,
+        rememberMe: form.rememberMe.checked,
+      };
+
+      if (!payload.email) {
+        setError("email", "Email is required.");
+        return;
+      }
+      if (!payload.password) {
+        setError("password", "Password is required.");
+        return;
+      }
+
+      setLoadingState(true);
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          if (data.errors) {
+            Object.keys(data.errors).forEach(function (field) {
+              setError(field, data.errors[field]);
+            });
+          } else {
+            setError("form", "Login failed. Please try again.");
+          }
+          return;
+        }
+        window.location.assign(data.redirect || "/auth/dashboard");
+      } catch (error) {
+        setError("form", "Network error. Please try again.");
+      } finally {
+        setLoadingState(false);
+      }
+    });
+  })();
+</script>
+{% endblock %}

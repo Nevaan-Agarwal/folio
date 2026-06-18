@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}My Archive - {{ t('app.name') }}{% endblock %}
+{% block page_title %}My Archive{% endblock %}
+
+{% block head_extra %}
+<style>
+  .archive-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; gap:12px; }
+  .archive-count { padding:6px 12px; border-radius:999px; border:1px solid var(--border-default); background:var(--bg-elevated); color:var(--text-secondary); font-size:12px; }
+  .archive-filter-bar { position:sticky; top:0; z-index:4; background:var(--bg-surface); border:1px solid var(--border-default); border-radius:var(--radius-lg); padding:14px; margin-bottom:18px; }
+  .archive-filter-row { display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:10px; margin-bottom:10px; }
+  .archive-filter-row:last-child { margin-bottom:0; }
+  .archive-filter-actions { display:flex; align-items:center; gap:10px; }
+  .archive-clear { background:none; border:0; color:var(--text-secondary); cursor:pointer; }
+  .archive-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+  .archive-card { background:var(--bg-surface); border:1px solid var(--border-default); border-radius:var(--radius-xl); padding:14px; transition:border-color .2s ease; cursor:pointer; }
+  .archive-card:hover { border-color:var(--accent-primary); }
+  .archive-top { display:flex; gap:10px; align-items:flex-start; }
+  .archive-thumb { width:48px; height:60px; object-fit:cover; border-radius:10px; background:var(--bg-primary); border:1px solid var(--border-default); }
+  .archive-merchant { margin:0; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .archive-date { margin:2px 0 0; color:var(--text-secondary); font-size:12px; }
+  .archive-middle { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:10px; }
+  .archive-occasion { margin:8px 0 0; color:var(--text-muted); font-style:italic; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .archive-bottom { display:flex; justify-content:space-between; align-items:center; margin-top:10px; gap:8px; }
+  .archive-total { color:var(--accent-primary); font-weight:700; font-size:18px; }
+  .archive-pdf-btn { border:1px solid var(--border-default); background:transparent; border-radius:8px; color:var(--text-secondary); padding:7px 10px; }
+  .archive-pdf-btn:hover { border-color:var(--accent-primary); color:var(--accent-primary); }
+  .cat-pill { display:inline-flex; padding:4px 9px; border-radius:999px; font-size:11px; border:1px solid transparent; }
+  .cat-restaurant { color:var(--success); background:var(--success-muted); border-color:rgba(45,212,160,.4); }
+  .cat-travel { color:#8bbcff; background:rgba(59,130,246,.16); border-color:rgba(59,130,246,.4); }
+  .cat-hotel { color:#c49cff; background:rgba(168,85,247,.16); border-color:rgba(168,85,247,.4); }
+  .cat-business-meal { color:var(--warning); background:var(--accent-muted); border-color:rgba(245,166,35,.4); }
+  .cat-other { color:#c7d0e6; background:rgba(138,151,176,.2); border-color:rgba(138,151,176,.45); }
+  .archive-empty { text-align:center; border:1px dashed var(--border-default); border-radius:var(--radius-xl); padding:32px 16px; color:var(--text-secondary); }
+  .archive-footer { margin-top:18px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+  @media (max-width: 1100px){ .archive-grid{grid-template-columns:repeat(2,minmax(0,1fr));} }
+  @media (max-width: 800px){ .archive-grid{grid-template-columns:1fr;} .archive-filter-row{grid-template-columns:1fr 1fr;} }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="archiveRoot" data-next-cursor="{{ next_cursor or '' }}">
+  <div class="archive-header">
+    <h2 style="margin:0;">My Archive</h2>
+    <span class="archive-count"><span id="archiveSubmissionCount">{{ total_submissions }}</span> submissions</span>
+  </div>
+
+  <form id="archiveFilters" class="archive-filter-bar" method="get" action="{{ url_for('archive.employee_archive') }}">
+    <div class="archive-filter-row">
+      <input class="input-field" type="date" name="date_from" value="{{ filters.date_from }}" />
+      <input class="input-field" type="date" name="date_to" value="{{ filters.date_to }}" />
+      <select class="input-field" name="month">
+        <option value="">Month</option>
+        {% for i in range(1, 13) %}
+        <option value="{{ i }}" {% if filters.month == i|string %}selected{% endif %}>{{ i }}</option>
+        {% endfor %}
+      </select>
+      <input class="input-field" type="number" min="2000" max="2100" placeholder="Year" name="year" value="{{ filters.year }}" />
+    </div>
+    <div class="archive-filter-row">
+      <input class="input-field" type="text" placeholder="Merchant" name="merchant" value="{{ filters.merchant }}" />
+      <select class="input-field" name="category">
+        <option value="">Category</option>
+        {% for cat in allowed_categories %}
+        <option value="{{ cat }}" {% if filters.category == cat %}selected{% endif %}>{{ cat }}</option>
+        {% endfor %}
+      </select>
+      <select class="input-field" name="sort">
+        {% for key,label in [('newest','Newest'),('oldest','Oldest'),('amount_high','Amount High'),('amount_low','Amount Low')] %}
+        <option value="{{ key }}" {% if filters.sort == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <div class="archive-filter-actions">
+        <button class="archive-clear" type="button" id="clearArchiveFilters">Clear Filters</button>
+        <button class="btn-primary" type="submit">Apply Filters</button>
+      </div>
+    </div>
+  </form>
+
+  <div id="archiveGrid" class="archive-grid"></div>
+  <div id="archiveEmpty" class="archive-empty" {% if submissions %}hidden{% endif %}>
+    <p style="margin:0 0 10px;">No submissions yet</p>
+    <a class="btn-primary" href="{{ url_for('receipts.new_receipt') }}">Scan your first receipt →</a>
+  </div>
+
+  <div class="archive-footer">
+    <p style="margin:0; color:var(--text-secondary);">Showing <span id="archiveShowing">{{ showing_count }}</span> of <span id="archiveTotal">{{ total_submissions }}</span> submissions</p>
+    <button id="archiveLoadMore" type="button" class="btn-secondary" {% if not next_cursor %}hidden{% endif %}>Load More</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.__archiveInitial = {{ submissions | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/archive.js') }}"></script>
+{% endblock %}

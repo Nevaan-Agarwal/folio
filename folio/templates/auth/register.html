@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% set standalone_auth = true %}
+
+{% block title %}{{ t('auth.register') }} - {{ t('app.name') }}{% endblock %}
+
+{% block auth_content %}
+<section class="register-layout">
+  <aside class="register-brand-panel">
+    <div class="register-brand-content">
+      <h1 class="register-logo">{{ t('app.name') }}</h1>
+      <p class="register-tagline">{{ t('app.tagline') }}</p>
+      <svg class="receipt-illustration" viewBox="0 0 360 220" fill="none" aria-hidden="true">
+        <path d="M70 24h180l40 40v132l-20-8-20 8-20-8-20 8-20-8-20 8-20-8-20 8-20-8V24Z" />
+        <path d="M104 78h130M104 108h130M104 138h94" />
+        <path d="M224 152c18 0 32 14 32 32" />
+      </svg>
+    </div>
+  </aside>
+
+  <main class="register-form-panel">
+    <div class="register-card">
+      <h2>{{ t('auth.register') }}</h2>
+      <p class="register-subtitle">{{ t('form.title') }}</p>
+
+      <form id="registerForm" method="post" action="{{ url_for('auth.register') }}" novalidate>
+        <div class="form-grid">
+          <div class="field-group">
+            <label for="firstName">{{ t('auth.firstName') }}</label>
+            <input class="input-field" id="firstName" name="firstName" type="text" required />
+            <p class="field-error" data-error-for="firstName"></p>
+          </div>
+          <div class="field-group">
+            <label for="surname">{{ t('auth.surname') }}</label>
+            <input class="input-field" id="surname" name="surname" type="text" required />
+            <p class="field-error" data-error-for="surname"></p>
+          </div>
+          <div class="field-group field-group-full">
+            <label for="email">{{ t('auth.email') }}</label>
+            <input class="input-field" id="email" name="email" type="email" required />
+            <p class="field-error" data-error-for="email"></p>
+          </div>
+          <div class="field-group field-group-full">
+            <label for="password">{{ t('auth.password') }}</label>
+            <input class="input-field" id="password" name="password" type="password" required />
+            <div class="strength-track"><div class="strength-fill" id="strengthFill"></div></div>
+            <p class="field-help" id="strengthLabel">Weak</p>
+            <p class="field-error" data-error-for="password"></p>
+          </div>
+          <div class="field-group field-group-full">
+            <label for="confirmPassword">Confirm Password</label>
+            <input
+              class="input-field"
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              required
+            />
+            <p class="field-error" data-error-for="confirmPassword"></p>
+          </div>
+        </div>
+
+        <p class="field-error" data-error-for="form"></p>
+        <button class="btn-primary register-submit" type="submit">{{ t('auth.register') }}</button>
+      </form>
+
+      <p class="auth-alt-link">
+        Already have an account?
+        <a href="{{ url_for('auth.login_page') }}">{{ t('auth.login') }}</a>
+      </p>
+    </div>
+  </main>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const form = document.getElementById("registerForm");
+    if (!form) return;
+
+    const passwordInput = document.getElementById("password");
+    const strengthFill = document.getElementById("strengthFill");
+    const strengthLabel = document.getElementById("strengthLabel");
+    const requiredFields = ["firstName", "surname", "email", "password", "confirmPassword"];
+
+    function setError(field, message) {
+      const errorEl = document.querySelector('[data-error-for="' + field + '"]');
+      if (errorEl) errorEl.textContent = message || "";
+    }
+
+    function clearErrors() {
+      requiredFields.concat(["form"]).forEach(function (field) {
+        setError(field, "");
+      });
+    }
+
+    function updateStrength(password) {
+      let score = 0;
+      if (password.length >= 8) score += 1;
+      if (/[A-Z]/.test(password)) score += 1;
+      if (/[0-9]/.test(password)) score += 1;
+
+      if (score <= 1) {
+        strengthFill.style.width = "33%";
+        strengthFill.style.background = "var(--error)";
+        strengthLabel.textContent = "Weak";
+      } else if (score === 2) {
+        strengthFill.style.width = "66%";
+        strengthFill.style.background = "var(--warning)";
+        strengthLabel.textContent = "Medium";
+      } else {
+        strengthFill.style.width = "100%";
+        strengthFill.style.background = "var(--success)";
+        strengthLabel.textContent = "Strong";
+      }
+    }
+
+    function clientValidate(payload) {
+      const errors = {};
+      if (!payload.firstName || payload.firstName.trim().length < 2) {
+        errors.firstName = "First Name is required (min 2 characters).";
+      }
+      if (!payload.surname || payload.surname.trim().length < 2) {
+        errors.surname = "Surname is required (min 2 characters).";
+      }
+      if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(payload.email || "")) {
+        errors.email = "Please provide a valid email address.";
+      }
+      const password = payload.password || "";
+      if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+        errors.password = "Password must be 8+ chars with an uppercase letter and number.";
+      }
+      if (payload.confirmPassword !== password) {
+        errors.confirmPassword = "Confirm Password must match Password.";
+      }
+      return errors;
+    }
+
+    passwordInput.addEventListener("input", function () {
+      updateStrength(passwordInput.value || "");
+    });
+    updateStrength(passwordInput.value || "");
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      clearErrors();
+
+      const payload = {
+        firstName: form.firstName.value,
+        surname: form.surname.value,
+        email: form.email.value,
+        password: form.password.value,
+        confirmPassword: form.confirmPassword.value,
+      };
+
+      const localErrors = clientValidate(payload);
+      if (Object.keys(localErrors).length > 0) {
+        Object.keys(localErrors).forEach(function (field) {
+          setError(field, localErrors[field]);
+        });
+        return;
+      }
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          if (data.errors) {
+            Object.keys(data.errors).forEach(function (field) {
+              setError(field, data.errors[field]);
+            });
+          } else {
+            setError("form", "Registration failed. Please try again.");
+          }
+          return;
+        }
+        window.location.assign(data.redirect || "/dashboard");
+      } catch (error) {
+        setError("form", "Network error. Please try again.");
+      }
+    });
+  })();
+</script>
+{% endblock %}

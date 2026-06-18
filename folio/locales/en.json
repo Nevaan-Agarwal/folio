@@ -1,0 +1,57 @@
+{
+  "app": {
+    "name": "Folio",
+    "tagline": "Hospitality Expense Automation"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "scan": "Scan Receipt",
+    "archive": "Archive",
+    "settings": "Settings",
+    "admin": "Admin"
+  },
+  "auth": {
+    "login": "Sign In",
+    "register": "Create Account",
+    "logout": "Sign Out",
+    "email": "Email Address",
+    "password": "Password",
+    "firstName": "First Name",
+    "surname": "Surname",
+    "forgotPassword": "Forgot Password?"
+  },
+  "receipt": {
+    "upload": "Upload Receipt",
+    "scan": "Scan Receipt",
+    "processing": "Processing receipt...",
+    "ocrComplete": "Scan complete",
+    "confidence": "Scan confidence"
+  },
+  "form": {
+    "title": "Hospitality Expense Form",
+    "host": "Host",
+    "guests": "Guests",
+    "occasion": "Occasion",
+    "date": "Date of Hospitality",
+    "location": "Location",
+    "merchant": "Merchant",
+    "amount": "Amount",
+    "tip": "Tip",
+    "total": "Total",
+    "approve": "Approve & Generate PDF",
+    "reject": "Reject"
+  },
+  "status": {
+    "uploaded": "Uploaded",
+    "processing": "Processing",
+    "review": "Awaiting Review",
+    "complete": "Complete",
+    "error": "Error"
+  },
+  "errors": {
+    "required": "This field is required",
+    "invalidEmail": "Invalid email address",
+    "uploadFailed": "Upload failed. Please try again.",
+    "ocrFailed": "Could not read receipt. Please retake photo."
+  }
+}

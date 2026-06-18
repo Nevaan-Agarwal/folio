@@ -1,0 +1,57 @@
+{
+  "app": {
+    "name": "Folio",
+    "tagline": "Automatisierung von Bewirtungsausgaben"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "scan": "Beleg scannen",
+    "archive": "Archiv",
+    "settings": "Einstellungen",
+    "admin": "Admin"
+  },
+  "auth": {
+    "login": "Anmelden",
+    "register": "Konto erstellen",
+    "logout": "Abmelden",
+    "email": "E-Mail-Adresse",
+    "password": "Passwort",
+    "firstName": "Vorname",
+    "surname": "Nachname",
+    "forgotPassword": "Passwort vergessen?"
+  },
+  "receipt": {
+    "upload": "Beleg hochladen",
+    "scan": "Beleg scannen",
+    "processing": "Beleg wird verarbeitet...",
+    "ocrComplete": "Scan abgeschlossen",
+    "confidence": "Scan-Genauigkeit"
+  },
+  "form": {
+    "title": "Bewirtungskostenformular",
+    "host": "Bewirtende Person",
+    "guests": "Bewirtete Personen",
+    "occasion": "Anlass der Bewirtung",
+    "date": "Tag der Bewirtung",
+    "location": "Ort der Bewirtung",
+    "merchant": "Händler",
+    "amount": "Betrag",
+    "tip": "Trinkgeld",
+    "total": "Gesamtsumme",
+    "approve": "Freigeben und PDF erstellen",
+    "reject": "Ablehnen"
+  },
+  "status": {
+    "uploaded": "Hochgeladen",
+    "processing": "In Bearbeitung",
+    "review": "Warten auf Prüfung",
+    "complete": "Abgeschlossen",
+    "error": "Fehler"
+  },
+  "errors": {
+    "required": "Dieses Feld ist erforderlich",
+    "invalidEmail": "Ungültige E-Mail-Adresse",
+    "uploadFailed": "Upload fehlgeschlagen. Bitte erneut versuchen.",
+    "ocrFailed": "Beleg konnte nicht gelesen werden. Bitte Foto erneut aufnehmen."
+  }
+}

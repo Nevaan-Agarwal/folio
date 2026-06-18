@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}User Detail - {{ t('app.name') }}{% endblock %}
+{% block page_title %}User Detail{% endblock %}
+
+{% block content %}
+<section class="card" style="margin-bottom:12px;">
+  <h2 style="margin-top:0;">{{ user.firstName }} {{ user.surname }}</h2>
+  <p class="settings-note" style="margin:0 0 6px;">{{ user.email }}</p>
+  <p class="settings-note" style="margin:0;">Role: {{ user.role }}{% if user.disabled %} • Disabled{% endif %}</p>
+</section>
+
+<section class="card" style="margin-bottom:12px;">
+  <h3 style="margin-top:0;">Submissions</h3>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>Document</th><th>Merchant</th><th>Category</th><th>Amount</th><th>Status</th><th>Date</th></tr>
+      </thead>
+      <tbody>
+        {% for item in submissions %}
+        <tr>
+          <td><a href="{{ url_for('archive.archive_document_detail', document_id=item.documentId) }}">{{ item.documentId }}</a></td>
+          <td>{{ item.merchant }}</td>
+          <td>{{ item.category }}</td>
+          <td>€{{ '%.2f'|format(item.amount) }}</td>
+          <td>{{ item.status }}</td>
+          <td>{{ item.createdAt[:10] if item.createdAt else '-' }}</td>
+        </tr>
+        {% endfor %}
+        {% if not submissions %}
+        <tr><td colspan="6" style="text-align:center;color:var(--text-secondary);">No submissions found.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <h3 style="margin-top:0;">Activity Log</h3>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Timestamp</th><th>Action</th><th>Performed By</th><th>Target User</th></tr></thead>
+      <tbody>
+        {% for event in activity %}
+        <tr>
+          <td>{{ event.timestamp or '-' }}</td>
+          <td>{{ event.action or '-' }}</td>
+          <td>{{ event.performedBy or event.uid or '-' }}</td>
+          <td>{{ event.targetUser or '-' }}</td>
+        </tr>
+        {% endfor %}
+        {% if not activity %}
+        <tr><td colspan="4" style="text-align:center;color:var(--text-secondary);">No activity yet.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

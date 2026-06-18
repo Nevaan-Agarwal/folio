@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t('receipt.upload') }} - {{ t('app.name') }}{% endblock %}
+{% block page_title %}{{ t('receipt.upload') }}{% endblock %}
+
+{% block content %}
+<section class="card upload-page-card">
+  <div class="upload-tabs" role="tablist" aria-label="Upload mode">
+    <button class="upload-tab upload-tab-active" type="button" data-tab="file">Upload File</button>
+    <button class="upload-tab" type="button" data-tab="camera">Use Camera</button>
+  </div>
+
+  <div class="upload-pane" data-pane="file">
+    <label class="dropzone" id="receiptDropzone">
+      <input id="receiptFileInput" type="file" accept=".jpg,.jpeg,.png,.webp,.heic" hidden />
+      <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 16V6m0 0-4 4m4-4 4 4M5 14.5V18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3.5" />
+      </svg>
+      <h3>Drag your receipt here</h3>
+      <p class="dropzone-subtext">or click to browse</p>
+      <p class="dropzone-note">JPG, PNG, WEBP up to 15MB</p>
+    </label>
+
+    <div id="filePreview" class="file-preview" hidden>
+      <img id="filePreviewImage" alt="Receipt preview" />
+      <div>
+        <p id="fileName" class="file-name"></p>
+        <p id="fileSize" class="file-size"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="upload-pane" data-pane="camera" hidden>
+    <div id="cameraDeniedState" class="camera-denied" hidden>
+      <p class="camera-denied-title">Camera access denied</p>
+      <p>Allow camera permissions in your browser settings, then retry.</p>
+    </div>
+    <div class="camera-preview-wrap">
+      <video id="cameraPreview" autoplay playsinline muted></video>
+      <canvas id="cameraCanvas" hidden></canvas>
+    </div>
+    <button class="btn-primary camera-capture-btn" type="button" id="cameraCaptureBtn">Capture</button>
+  </div>
+
+  <button class="btn-primary upload-submit" type="button" id="uploadNowBtn">Upload Receipt</button>
+
+  <div class="upload-progress" id="uploadProgress" hidden>
+    <div class="upload-progress-track">
+      <div class="upload-progress-fill" id="uploadProgressFill"></div>
+    </div>
+  </div>
+</section>
+
+<div class="toast-container" id="uploadToastContainer"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/upload.js') }}"></script>
+{% endblock %}

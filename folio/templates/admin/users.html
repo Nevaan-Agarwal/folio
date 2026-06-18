@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}User Management - {{ t('app.name') }}{% endblock %}
+{% block page_title %}User Management{% endblock %}
+
+{% block head_extra %}
+<style>
+  .users-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:12px; }
+  .users-stat { background:var(--bg-surface); border:1px solid var(--border-default); border-radius:var(--radius-lg); padding:12px; }
+  .users-stat p { margin:0; color:var(--text-secondary); font-size:12px; }
+  .users-stat h3 { margin:6px 0 0; font-size:22px; }
+  .users-filter { display:grid; grid-template-columns:2fr 2fr 1fr auto; gap:10px; margin-bottom:12px; }
+  .users-table-wrap { overflow:auto; border:1px solid var(--border-default); border-radius:var(--radius-lg); }
+  .users-table { width:100%; border-collapse:collapse; min-width:900px; }
+  .users-table th { background:var(--bg-elevated); color:var(--text-secondary); text-transform:uppercase; font-size:11px; letter-spacing:.08em; }
+  .users-table th, .users-table td { border-bottom:1px solid var(--border-default); padding:10px; text-align:left; }
+  .user-avatar { width:32px; height:32px; border-radius:50%; display:grid; place-items:center; background:var(--bg-elevated); color:var(--accent-primary); font-family:var(--font-mono); font-size:12px; border:1px solid var(--border-default); }
+  .role-pill { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; font-size:12px; border:1px solid transparent; }
+  .role-admin { color:var(--warning); background:var(--accent-muted); border-color:rgba(245,166,35,.35); }
+  .role-employee { color:var(--text-secondary); background:rgba(138,151,176,.18); border-color:rgba(138,151,176,.32); }
+  .actions { display:flex; flex-wrap:wrap; gap:6px; }
+  .btn-sm { padding:6px 10px; font-size:12px; }
+  .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; place-items:center; z-index:100; }
+  .modal-backdrop.show { display:grid; }
+  .modal-card { width:min(480px, calc(100vw - 24px)); background:var(--bg-surface); border:1px solid var(--border-default); border-radius:var(--radius-xl); padding:18px; }
+  .modal-card h3 { margin:0 0 8px; }
+  .modal-card p { margin:0 0 14px; color:var(--text-secondary); }
+  .modal-actions { display:flex; justify-content:flex-end; gap:8px; }
+  @media (max-width:900px){ .users-filter{grid-template-columns:1fr 1fr;} .users-stats{grid-template-columns:1fr;} }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="users-stats">
+  <article class="users-stat"><p>Total users</p><h3>{{ total_users }}</h3></article>
+  <article class="users-stat"><p>Admin count</p><h3>{{ admin_count }}</h3></article>
+  <article class="users-stat"><p>Employee count</p><h3>{{ employee_count }}</h3></article>
+</section>
+
+<form class="users-filter" method="get" action="{{ url_for('admin.admin_users') }}">
+  <input class="input-field" type="text" name="name" placeholder="Search by name" value="{{ filters.name }}" />
+  <input class="input-field" type="text" name="email" placeholder="Search by email" value="{{ filters.email }}" />
+  <select class="input-field" name="role">
+    <option value="">All Roles</option>
+    <option value="admin" {% if filters.role == 'admin' %}selected{% endif %}>Admin</option>
+    <option value="employee" {% if filters.role == 'employee' %}selected{% endif %}>Employee</option>
+  </select>
+  <button class="btn-primary" type="submit">Apply</button>
+</form>
+
+<div class="users-table-wrap">
+  <table class="users-table">
+    <thead>
+      <tr>
+        <th>Avatar</th><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Submissions</th><th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user in users %}
+      <tr>
+        <td><span class="user-avatar">{{ (user.name[:1] or 'U')|upper }}</span></td>
+        <td>{{ user.name }}</td>
+        <td>{{ user.email }}</td>
+        <td>
+          {% if user.role == "admin" %}
+          <span class="role-pill role-admin">★ Admin</span>
+          {% else %}
+          <span class="role-pill role-employee">Employee</span>
+          {% endif %}
+        </td>
+        <td>{{ user.joined or '-' }}</td>
+        <td>{{ user.submissions }}</td>
+        <td>
+          <div class="actions">
+            {% if user.role == "employee" %}
+            <button class="btn-primary btn-sm" type="button" data-action="promote" data-user-id="{{ user.id }}" data-user-name="{{ user.name }}">Promote to Admin</button>
+            {% else %}
+            <button class="btn-danger btn-sm" type="button" data-action="demote" data-user-id="{{ user.id }}" data-user-name="{{ user.name }}" {% if user.id == current_admin_id %}disabled{% endif %}>Demote</button>
+            {% endif %}
+            <a class="btn-secondary btn-sm" href="{{ url_for('admin.admin_user_detail', user_id=user.id) }}">View Profile</a>
+            <button class="btn-danger btn-sm" type="button" data-action="deactivate" data-user-id="{{ user.id }}" data-user-name="{{ user.name }}" {% if user.id == current_admin_id %}disabled{% endif %}>Deactivate</button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not users %}
+      <tr><td colspan="7" style="text-align:center;color:var(--text-secondary);">No users found.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<div id="actionModal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-card">
+    <h3 id="modalTitle">Confirm Action</h3>
+    <p id="modalDescription"></p>
+    <div class="modal-actions">
+      <button id="cancelActionBtn" class="btn-secondary" type="button">Cancel</button>
+      <button id="confirmActionBtn" class="btn-primary" type="button">Confirm</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const modal = document.getElementById("actionModal");
+    const title = document.getElementById("modalTitle");
+    const desc = document.getElementById("modalDescription");
+    const confirm = document.getElementById("confirmActionBtn");
+    const cancel = document.getElementById("cancelActionBtn");
+    let pendingAction = null;
+    let pendingUserId = null;
+
+    function openModal(action, userId, userName) {
+      pendingAction = action;
+      pendingUserId = userId;
+      if (action === "promote") {
+        title.textContent = "Promote " + userName + " to Admin?";
+        desc.textContent = "Admin users can access all company data and analytics.";
+        confirm.className = "btn-primary";
+      } else if (action === "demote") {
+        title.textContent = "Remove Admin access from " + userName + "?";
+        desc.textContent = "This user will lose access to admin features.";
+        confirm.className = "btn-danger";
+      } else {
+        title.textContent = "Deactivate " + userName + "?";
+        desc.textContent = "Deactivated users cannot log in.";
+        confirm.className = "btn-danger";
+      }
+      modal.classList.add("show");
+      modal.setAttribute("aria-hidden", "false");
+    }
+
+    function closeModal() {
+      pendingAction = null;
+      pendingUserId = null;
+      modal.classList.remove("show");
+      modal.setAttribute("aria-hidden", "true");
+    }
+
+    document.querySelectorAll("[data-action]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const action = btn.getAttribute("data-action");
+        const userId = btn.getAttribute("data-user-id");
+        const userName = btn.getAttribute("data-user-name") || "user";
+        if (!action || !userId) return;
+        openModal(action, userId, userName);
+      });
+    });
+
+    cancel.addEventListener("click", closeModal);
+    modal.addEventListener("click", function (event) {
+      if (event.target === modal) closeModal();
+    });
+
+    confirm.addEventListener("click", async function () {
+      if (!pendingAction || !pendingUserId) return;
+      const response = await fetch("/admin/users/" + pendingUserId + "/" + pendingAction, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+      });
+      closeModal();
+      if (response.ok) {
+        window.location.reload();
+      }
+    });
+  })();
+</script>
+{% endblock %}

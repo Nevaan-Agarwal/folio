@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Analytics - {{ t('app.name') }}{% endblock %}
+{% block page_title %}Admin Analytics{% endblock %}
+
+{% block head_extra %}
+<style>
+  .analytics-filter { background:var(--bg-surface); border:1px solid var(--border-default); border-radius:var(--radius-lg); padding:14px; margin-bottom:14px; position:sticky; top:0; z-index:4; }
+  .analytics-quick { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+  .quick-pill { border:1px solid var(--border-default); border-radius:999px; background:var(--bg-elevated); color:var(--text-secondary); padding:7px 10px; cursor:pointer; font-size:12px; }
+  .quick-pill:hover { border-color:var(--accent-primary); color:var(--accent-primary); }
+  .analytics-filter-row { display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:10px; }
+  .analytics-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:14px; }
+  .kpi-card { background:var(--bg-surface); border:1px solid var(--border-default); border-radius:var(--radius-xl); padding:20px; }
+  .kpi-label { margin:0; color:var(--text-secondary); font-size:12px; text-transform:uppercase; letter-spacing:.1em; }
+  .kpi-value { margin:8px 0 0; font-size:30px; font-weight:700; color:var(--accent-primary); }
+  .kpi-sub { margin:6px 0 0; color:var(--text-muted); font-size:12px; }
+  .kpi-pending-ok { color:var(--success); }
+  .kpi-pending-alert { color:var(--error); }
+  .chart-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
+  .chart-card { background:var(--bg-surface); border:1px solid var(--border-default); border-radius:var(--radius-lg); padding:14px; }
+  .chart-card.full { grid-column:1 / -1; }
+  .chart-title { margin:0 0 10px; font-size:14px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.08em; }
+  .analytics-table { width:100%; border-collapse:collapse; }
+  .analytics-table th { color:var(--text-secondary); text-transform:uppercase; font-size:11px; letter-spacing:.08em; background:var(--bg-elevated); }
+  .analytics-table th, .analytics-table td { border-bottom:1px solid var(--border-default); padding:10px; text-align:left; }
+  .analytics-table tr:nth-child(even) td { background:rgba(255,255,255,.02); }
+  @media (max-width: 1000px){ .analytics-kpis{grid-template-columns:1fr 1fr;} .chart-grid{grid-template-columns:1fr;} .chart-card.full{grid-column:auto;} .analytics-filter-row{grid-template-columns:1fr 1fr;} }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="analytics-filter">
+  <div class="analytics-quick">
+    <button class="quick-pill" type="button" data-range="this_month">This Month</button>
+    <button class="quick-pill" type="button" data-range="last_3_months">Last 3 Months</button>
+    <button class="quick-pill" type="button" data-range="this_year">This Year</button>
+    <button class="quick-pill" type="button" data-range="all_time">All Time</button>
+  </div>
+  <div class="analytics-filter-row">
+    <input class="input-field" id="analyticsStartDate" type="date" value="{{ filters.start_date }}" />
+    <input class="input-field" id="analyticsEndDate" type="date" value="{{ filters.end_date }}" />
+    <button id="analyticsRefreshBtn" class="btn-primary" type="button">Refresh</button>
+    <a id="analyticsDownloadBtn" class="btn-secondary" href="{{ url_for('admin.admin_analytics_export', start_date=filters.start_date, end_date=filters.end_date) }}">Download Report</a>
+  </div>
+</section>
+
+<section class="analytics-kpis">
+  <article class="kpi-card"><p class="kpi-label">Total Spending</p><p id="kpiTotalSpending" class="kpi-value">EUR 0.00</p></article>
+  <article class="kpi-card"><p class="kpi-label">Submissions</p><p id="kpiSubmissions" class="kpi-value">0</p><p class="kpi-sub">this period</p></article>
+  <article class="kpi-card"><p class="kpi-label">Average Expense</p><p id="kpiAvgExpense" class="kpi-value">EUR 0.00</p></article>
+  <article class="kpi-card"><p class="kpi-label">Pending Review</p><p id="kpiPending" class="kpi-value kpi-pending-ok">0</p></article>
+</section>
+
+<section class="chart-grid">
+  <article class="chart-card full"><h3 class="chart-title">Spending by Month</h3><canvas id="spendingByMonthChart" height="110"></canvas></article>
+  <article class="chart-card"><h3 class="chart-title">Spending by Category</h3><canvas id="spendingByCategoryChart" height="180"></canvas></article>
+  <article class="chart-card"><h3 class="chart-title">Top Employees by Spending</h3><canvas id="topEmployeesChart" height="180"></canvas></article>
+</section>
+
+<section class="chart-grid">
+  <article class="chart-card">
+    <h3 class="chart-title">Top Merchants</h3>
+    <table class="analytics-table">
+      <thead><tr><th>#</th><th>Merchant</th><th>Total Spent</th><th>Submissions</th><th>Avg Amount</th></tr></thead>
+      <tbody id="topMerchantsTableBody"></tbody>
+    </table>
+  </article>
+  <article class="chart-card">
+    <h3 class="chart-title">Recent Activity</h3>
+    <table class="analytics-table">
+      <thead><tr><th>Employee</th><th>Merchant</th><th>Amount</th><th>Category</th><th>Date</th><th>Status</th></tr></thead>
+      <tbody id="recentActivityTableBody"></tbody>
+    </table>
+  </article>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  window.__analyticsInitial = {{ dashboard_data | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+{% endblock %}

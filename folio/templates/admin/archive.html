@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Archive - {{ t('app.name') }}{% endblock %}
+{% block page_title %}Admin Archive{% endblock %}
+
+{% block head_extra %}
+<style>
+  .admin-header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; }
+  .admin-badge { display:inline-flex; padding:6px 12px; border-radius:999px; background:var(--accent-muted); border:1px solid rgba(245,166,35,.4); color:var(--warning); font-size:12px; font-weight:600; }
+  .admin-filter-card { background:var(--bg-surface); border:1px solid var(--border-default); border-radius:var(--radius-lg); padding:14px; margin-bottom:14px; position:sticky; top:0; z-index:3; }
+  .admin-filter-row { display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:10px; }
+  .admin-filter-row:last-child { margin-bottom:0; }
+  .admin-filter-actions { display:flex; gap:8px; align-items:center; }
+  .admin-clear { background:none; border:0; color:var(--text-secondary); cursor:pointer; }
+  .admin-summary { margin-bottom:10px; color:var(--text-secondary); }
+  .admin-table-wrap { overflow:auto; border:1px solid var(--border-default); border-radius:var(--radius-lg); }
+  .admin-table { width:100%; border-collapse:collapse; min-width:1100px; }
+  .admin-table th { background:var(--bg-elevated); color:var(--text-secondary); text-transform:uppercase; font-size:11px; letter-spacing:.08em; }
+  .admin-table th, .admin-table td { border-bottom:1px solid var(--border-default); padding:10px 12px; text-align:left; vertical-align:middle; }
+  .admin-table tr { background:var(--bg-surface); }
+  .admin-table tbody tr:hover { background:var(--bg-elevated); }
+  .admin-thumb { width:44px; height:56px; border-radius:8px; object-fit:cover; border:1px solid var(--border-default); background:var(--bg-primary); }
+  .admin-amount { color:var(--accent-primary); font-family:var(--font-mono); font-weight:700; }
+  .admin-actions { display:flex; gap:6px; opacity:.7; }
+  .admin-table tbody tr:hover .admin-actions { opacity:1; }
+  .admin-icon-btn { border:1px solid var(--border-default); background:transparent; color:var(--text-secondary); border-radius:8px; padding:5px 8px; }
+  .admin-icon-btn:hover { border-color:var(--accent-primary); color:var(--accent-primary); }
+  .admin-pagination { display:flex; justify-content:flex-end; gap:8px; margin-top:10px; }
+  @media (max-width: 900px){ .admin-filter-row { grid-template-columns:1fr 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-header">
+  <h2 style="margin:0;">Company Archive</h2>
+  <span class="admin-badge">Admin View</span>
+</div>
+
+<form class="admin-filter-card" method="get" action="{{ url_for('admin.admin_archive') }}">
+  <div class="admin-filter-row">
+    <input class="input-field" type="date" name="date_from" value="{{ filters.date_from }}" />
+    <input class="input-field" type="date" name="date_to" value="{{ filters.date_to }}" />
+    <select class="input-field" name="employee_id">
+      <option value="">All Employees</option>
+      {% for employee in employees %}
+      <option value="{{ employee.id }}" {% if filters.employee_id == employee.id %}selected{% endif %}>{{ employee.firstName }} {{ employee.surname }}</option>
+      {% endfor %}
+    </select>
+    <select class="input-field" name="category">
+      <option value="">Category</option>
+      {% for cat in ['Restaurant','Business Meal','Client Meeting','Travel','Hotel','Transportation','Office Supplies','Entertainment','Training','Other'] %}
+      <option value="{{ cat }}" {% if filters.category == cat %}selected{% endif %}>{{ cat }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="admin-filter-row">
+    <input class="input-field" type="text" placeholder="Merchant" name="merchant" value="{{ filters.merchant }}" />
+    <input class="input-field" type="text" placeholder="Host" name="host" value="{{ filters.host }}" />
+    <input class="input-field" type="text" placeholder="Occasion" name="occasion" value="{{ filters.occasion }}" />
+    <select class="input-field" name="status">
+      <option value="">Status</option>
+      {% for st in statuses %}
+      <option value="{{ st }}" {% if filters.status == st %}selected{% endif %}>{{ st }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="admin-filter-row">
+    <input class="input-field" type="number" step="0.01" name="amount_min" placeholder="Min Amount" value="{{ filters.amount_min }}" />
+    <input class="input-field" type="number" step="0.01" name="amount_max" placeholder="Max Amount" value="{{ filters.amount_max }}" />
+    <select class="input-field" name="sort">
+      {% for key,label in [('newest','Newest'),('oldest','Oldest'),('amount_high','Amount High'),('amount_low','Amount Low')] %}
+      <option value="{{ key }}" {% if filters.sort == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <div class="admin-filter-actions">
+      <a class="btn-secondary" href="{{ export_csv_url }}">Export CSV</a>
+      <a class="btn-secondary" href="{{ export_xlsx_url }}">Export XLSX</a>
+      <a class="admin-clear" href="{{ url_for('admin.admin_archive') }}">Clear All</a>
+      <button class="btn-primary" type="submit">Apply</button>
+    </div>
+  </div>
+  <input type="hidden" name="page" value="1" />
+  <input type="hidden" name="per_page" value="{{ per_page }}" />
+</form>
+
+<p class="admin-summary">{{ total_count }} results • Total: €{{ '%.2f'|format(total_amount) }} • Avg: €{{ '%.2f'|format(avg_amount) }}</p>
+
+<div class="admin-table-wrap">
+  <table class="admin-table">
+    <thead>
+      <tr>
+        <th>Thumbnail</th>
+        <th>Employee</th>
+        <th>Merchant</th>
+        <th>Date</th>
+        <th>Category</th>
+        <th>Amount</th>
+        <th>Host</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td><img class="admin-thumb" src="{{ row.thumbnail }}" alt="receipt thumbnail" /></td>
+        <td>{{ row.employee_name }}</td>
+        <td>{{ row.merchant }}</td>
+        <td>{{ row.date }}</td>
+        <td>{{ row.category }}</td>
+        <td class="admin-amount">€{{ '%.2f'|format(row.total_amount) }}</td>
+        <td>{{ row.host or '-' }}</td>
+        <td>
+          {% if row.status in ['pdf_generated','completed'] %}<span class="badge-success">{{ row.status }}</span>
+          {% elif row.status == 'error' %}<span class="badge-error">{{ row.status }}</span>
+          {% else %}<span class="badge-warning">{{ row.status }}</span>{% endif %}
+        </td>
+        <td>
+          <div class="admin-actions">
+            <a class="admin-icon-btn" href="{{ url_for('archive.archive_document_detail', document_id=row.document_id) }}">👁</a>
+            <a class="admin-icon-btn" href="{{ row.pdf_url }}" download>⬇</a>
+            <a class="admin-icon-btn" href="/admin/users/{{ row.user_id }}">👤</a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not rows %}
+      <tr><td colspan="9" style="text-align:center;color:var(--text-secondary);">No archive entries found.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<div class="admin-pagination">
+  {% if prev_url %}
+  <a class="btn-secondary" href="{{ prev_url }}">Previous</a>
+  {% endif %}
+  {% if next_url %}
+  <a class="btn-secondary" href="{{ next_url }}">Next</a>
+  {% endif %}
+</div>
+{% endblock %}

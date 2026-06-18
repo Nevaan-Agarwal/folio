@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Logs - {{ t('app.name') }}{% endblock %}
+{% block page_title %}Audit Logs{% endblock %}
+
+{% block head_extra %}
+<style>
+  .audit-filter { display:grid; grid-template-columns:2fr 2fr 1fr 1fr auto; gap:10px; margin-bottom:12px; }
+  .audit-table-wrap { overflow:auto; border:1px solid var(--border-default); border-radius:var(--radius-lg); }
+  .audit-table { width:100%; border-collapse:collapse; min-width:1000px; }
+  .audit-table th, .audit-table td { border-bottom:1px solid var(--border-default); padding:10px; text-align:left; vertical-align:top; }
+  .audit-table th { background:var(--bg-elevated); color:var(--text-secondary); font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+  .audit-meta { color:var(--text-secondary); margin-bottom:10px; }
+  .audit-pagination { margin-top:10px; display:flex; justify-content:flex-end; gap:8px; }
+  .audit-details { white-space:pre-wrap; font-family:var(--font-mono); font-size:12px; color:var(--text-secondary); }
+  @media (max-width:900px){ .audit-filter{grid-template-columns:1fr 1fr;} }
+</style>
+{% endblock %}
+
+{% block content %}
+<form class="audit-filter" method="get" action="{{ url_for('admin.admin_audit_logs') }}">
+  <input class="input-field" type="text" name="user" value="{{ filters.user }}" placeholder="User name or ID" />
+  <select class="input-field" name="action">
+    <option value="">All Actions</option>
+    {% for value in action_values %}
+    <option value="{{ value }}" {% if filters.action == value %}selected{% endif %}>{{ value }}</option>
+    {% endfor %}
+  </select>
+  <input class="input-field" type="date" name="date_from" value="{{ filters.date_from }}" />
+  <input class="input-field" type="date" name="date_to" value="{{ filters.date_to }}" />
+  <button class="btn-primary" type="submit">Apply</button>
+</form>
+
+<p class="audit-meta">{{ total_count }} log entries</p>
+
+<div class="audit-table-wrap">
+  <table class="audit-table">
+    <thead>
+      <tr><th>Timestamp</th><th>User</th><th>Action</th><th>IP Address</th><th>Details</th></tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td>{{ row.timestamp or '-' }}</td>
+        <td>{{ row.user_name }}</td>
+        <td>{{ row.action }}</td>
+        <td>{{ row.ip_address }}</td>
+        <td><div class="audit-details">{{ row.details }}</div></td>
+      </tr>
+      {% endfor %}
+      {% if not rows %}
+      <tr><td colspan="5" style="text-align:center;color:var(--text-secondary);">No audit logs found.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<div class="audit-pagination">
+  {% if prev_url %}
+  <a class="btn-secondary" href="{{ prev_url }}">Previous</a>
+  {% endif %}
+  {% if next_url %}
+  <a class="btn-secondary" href="{{ next_url }}">Next</a>
+  {% endif %}
+</div>
+{% endblock %}

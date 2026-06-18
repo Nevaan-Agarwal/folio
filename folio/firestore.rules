@@ -1,0 +1,115 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasUserDoc() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function roleFromDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'admin' ||
+        (hasUserDoc() && roleFromDoc() == 'admin')
+      );
+    }
+
+    function isEmployee() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'employee' ||
+        (hasUserDoc() && roleFromDoc() == 'employee')
+      );
+    }
+
+    function isValidRole(role) {
+      return role in ['employee', 'admin'];
+    }
+
+    function profileFieldsUnchangedOnUpdate() {
+      return request.resource.data.role == resource.data.role &&
+        request.resource.data.email == resource.data.email &&
+        request.resource.data.disabled == resource.data.disabled &&
+        request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function profileChangedKeysAllowed() {
+      return request.resource.data.diff(resource.data).changedKeys()
+        .hasOnly(['firstName', 'surname', 'language']);
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow update: if isOwner(userId) &&
+        profileFieldsUnchangedOnUpdate() &&
+        profileChangedKeysAllowed();
+      allow create, delete: if false;
+    }
+
+    match /receipts/{receiptId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update: if (
+          isAdmin() ||
+          isOwner(resource.data.userId)
+        ) &&
+        request.resource.data.userId == resource.data.userId;
+      allow delete: if false;
+    }
+
+    match /forms/{formId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update: if (
+          isAdmin() ||
+          (isOwner(resource.data.userId) && resource.data.status != 'approved')
+        ) &&
+        request.resource.data.userId == resource.data.userId;
+      allow delete: if false;
+    }
+
+    // Current collection names used by Folio backend.
+    match /combined_documents/{docId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /analytics_cache/{cacheId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Aliases to support alternate naming patterns.
+    match /combinedDocuments/{docId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /analyticsCache/{cacheId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+  }
+}
