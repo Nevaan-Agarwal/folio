@@ -1,12 +1,12 @@
 flask==3.0.0
 pytesseract==0.3.10
-opencv-python-headless==4.9.0.80
+opencv-python-headless
 openai==1.30.0
 reportlab==4.1.0
 python-dotenv==1.0.0
 flask-limiter==3.5.0
 pillow
-numpy==1.26.4
+numpy
 gunicorn==21.2.0
 pytest==8.2.0
 python-jose==3.3.0
