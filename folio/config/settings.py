@@ -1,24 +1,9 @@
-"""Environment-specific settings for Folio."""
-
-import json
 import os
 from datetime import timedelta
 
 from dotenv import load_dotenv
 
 load_dotenv()
-
-
-def _parse_project_id_from_credentials(credentials_path: str) -> str:
-    if not credentials_path or not os.path.exists(credentials_path):
-        return ""
-    try:
-        with open(credentials_path, "r", encoding="utf-8") as file:
-            payload = json.load(file)
-        return payload.get("project_id", "")
-    except (OSError, json.JSONDecodeError):
-        return ""
-
 
 class BaseConfig:
     """Base configuration shared by all environments."""
@@ -29,16 +14,14 @@ class BaseConfig:
     SESSION_COOKIE_SECURE = False
     PERMANENT_SESSION_LIFETIME = timedelta(hours=8)
 
-    FIREBASE_CREDENTIALS_PATH = os.getenv("FIREBASE_CREDENTIALS_PATH", "")
-    FIREBASE_STORAGE_BUCKET = os.getenv("FIREBASE_STORAGE_BUCKET", "")
-    FIREBASE_PROJECT_ID = _parse_project_id_from_credentials(FIREBASE_CREDENTIALS_PATH)
-    FIREBASE_WEB_API_KEY = os.getenv("FIREBASE_WEB_API_KEY", "")
+    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///folio.db")
+    STORAGE_ROOT = os.getenv("STORAGE_ROOT", "storage")
 
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
     OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4")
 
-    SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
-    SENDGRID_FROM_EMAIL = os.getenv("SENDGRID_FROM_EMAIL", "")
+    RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+    RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "")
 
     APP_URL = os.getenv("APP_URL", "http://localhost:5000")
     SUPPORTED_LANGUAGES = ["en", "de"]

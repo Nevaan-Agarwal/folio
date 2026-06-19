@@ -564,11 +564,6 @@ def promote_user(user_id: str):
         return jsonify({"success": False, "message": "User is not eligible for promotion."}), 400
 
     user_repository.update_user(user_id, {"role": "admin"})
-    if firebase_config.firebase_auth is not None:
-        try:
-            firebase_config.firebase_auth.set_custom_user_claims(user_id, {"role": "admin"})
-        except Exception:
-            pass
     audit_repository.create_log(
         user_id=g.user.get("uid"),
         action="user_promoted_to_admin",
@@ -598,12 +593,6 @@ def demote_user(user_id: str):
         return jsonify({"success": False, "message": "Cannot remove last admin"}), 400
 
     user_repository.update_user(user_id, {"role": "employee"})
-    if firebase_config.firebase_auth is not None:
-        try:
-            firebase_config.firebase_auth.set_custom_user_claims(user_id, None)
-            firebase_config.firebase_auth.revoke_refresh_tokens(user_id)
-        except Exception:
-            pass
     audit_repository.create_log(
         user_id=g.user.get("uid"),
         action="user_demoted",
@@ -627,12 +616,6 @@ def deactivate_user(user_id: str):
         return jsonify({"success": False, "message": "Cannot deactivate your own account."}), 400
 
     user_repository.update_user(user_id, {"disabled": True})
-    if firebase_config.firebase_auth is not None:
-        try:
-            firebase_config.firebase_auth.update_user(user_id, disabled=True)
-            firebase_config.firebase_auth.revoke_refresh_tokens(user_id)
-        except Exception:
-            pass
     audit_repository.create_log(
         user_id=g.user.get("uid"),
         action="user_deactivated",

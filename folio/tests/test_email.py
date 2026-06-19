@@ -90,7 +90,7 @@ def test_email_sends_with_pdf_attachment(monkeypatch):
         calls.update(kwargs)
         return ("msg-1", None)
 
-    monkeypatch.setattr(service, "_send_via_sendgrid", _fake_send)
+    monkeypatch.setattr(service, "_send_via_resend", _fake_send)
     result = service.send_pdf_delivery(
         to_email="alice@example.com",
         user_name="Alice",
@@ -124,7 +124,7 @@ def test_delivery_status_saved_to_firestore(monkeypatch):
     fake_db = _FakeDB()
     monkeypatch.setattr(firebase_config, "db", fake_db)
     service = EmailService()
-    monkeypatch.setattr(service, "_send_via_sendgrid", lambda **_kwargs: ("msg-2", None))
+    monkeypatch.setattr(service, "_send_via_resend", lambda **_kwargs: ("msg-2", None))
     result = service.send_pdf_delivery(
         to_email="alice@example.com",
         user_name="Alice",
@@ -215,7 +215,7 @@ def test_pdf_attachment_is_correct_file(monkeypatch):
         calls.update(kwargs)
         return ("msg-3", None)
 
-    monkeypatch.setattr(service, "_send_via_sendgrid", _fake_send)
+    monkeypatch.setattr(service, "_send_via_resend", _fake_send)
     service.send_pdf_delivery(
         to_email="alice@example.com",
         user_name="Alice",

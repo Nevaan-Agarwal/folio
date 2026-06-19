@@ -4,7 +4,6 @@ from dataclasses import asdict
 from datetime import datetime
 
 from flask import Blueprint, g, jsonify, render_template, request
-from firebase_admin import firestore
 
 from config import firebase as firebase_config
 from middleware.auth_middleware import require_auth
@@ -93,7 +92,7 @@ def _get_audit_timeline(document_id: str, form_id: str, receipt_id: str, user_id
         return []
     events = []
     for doc in (
-        firebase_config.db.collection("audit_logs")
+        firebase_config.db.collection("auditLogs")
         .where("uid", "==", user_id)
         .stream()
     ):
@@ -129,7 +128,7 @@ def _fetch_archive_page(
         "userId", "==", user_id
     )
     total_count = len(list(base_query.stream()))
-    query = base_query.order_by("createdAt", direction=firestore.Query.DESCENDING).limit(
+    query = base_query.order_by("createdAt", direction="DESCENDING").limit(
         page_size
     )
     if cursor:

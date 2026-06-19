@@ -1,9 +1,11 @@
-"""Email delivery service using SendGrid."""
+"""Email delivery service using Resend."""
 
 from __future__ import annotations
 
 import base64
+import json
 import os
+from urllib import error, request as urllib_request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -62,7 +64,7 @@ class EmailService:
             support_email="support@folio.app",
         )
 
-    def _send_via_sendgrid(
+    def _send_via_resend(
         self,
         to_email: str,
         subject: str,
@@ -71,40 +73,44 @@ class EmailService:
         pdf_bytes: bytes,
         filename: str,
     ) -> tuple[str | None, str | None]:
-        from sendgrid import SendGridAPIClient
-        from sendgrid.helpers.mail import (
-            Attachment,
-            Disposition,
-            FileContent,
-            FileName,
-            FileType,
-            Mail,
-        )
-
-        api_key = os.getenv("SENDGRID_API_KEY", "")
-        from_email = os.getenv("SENDGRID_FROM_EMAIL", "noreply@folio.app")
+        api_key = os.getenv("RESEND_API_KEY", "")
+        from_email = os.getenv("RESEND_FROM_EMAIL", "Folio <onboarding@resend.dev>")
         if not api_key:
-            raise RuntimeError("SENDGRID_API_KEY is missing")
+            raise RuntimeError("RESEND_API_KEY is missing")
 
-        message = Mail(
-            from_email=from_email,
-            to_emails=to_email,
-            subject=subject,
-            plain_text_content=plain_text,
-            html_content=html_content,
+        payload = {
+            "from": from_email,
+            "to": [to_email],
+            "subject": subject,
+            "text": plain_text,
+            "html": html_content,
+            "attachments": [
+                {
+                    "filename": filename,
+                    "content": base64.b64encode(pdf_bytes).decode("utf-8"),
+                }
+            ],
+        }
+        req = urllib_request.Request(
+            "https://api.resend.com/emails",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
         )
-        encoded_pdf = base64.b64encode(pdf_bytes).decode("utf-8")
-        message.attachment = Attachment(
-            FileContent(encoded_pdf),
-            FileName(filename),
-            FileType("application/pdf"),
-            Disposition("attachment"),
-        )
-        response = SendGridAPIClient(api_key).send(message)
-        message_id = response.headers.get("X-Message-Id")
-        if response.status_code >= 400:
-            return None, f"SendGrid error: {response.status_code}"
-        return message_id, None
+        try:
+            with urllib_request.urlopen(req, timeout=20) as response:
+                body = response.read().decode("utf-8")
+                decoded = json.loads(body or "{}")
+                message_id = decoded.get("id")
+                return message_id, None
+        except error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="ignore")
+            return None, f"Resend error: {exc.code} {body}"
+        except Exception as exc:
+            return None, str(exc)
 
     def send_pdf_delivery(
         self,
@@ -127,7 +133,7 @@ class EmailService:
             merge=True,
         )
         try:
-            message_id, error = self._send_via_sendgrid(
+            message_id, error = self._send_via_resend(
                 to_email=to_email,
                 subject=subject,
                 plain_text=plain_text,
@@ -161,6 +167,44 @@ class EmailService:
             )
             return {"success": False, "message_id": None, "error": str(exc)}
 
+    def send_email_with_html(
+        self,
+        api_key: str,
+        from_email: str,
+        to_email: str,
+        subject: str,
+        plain_text: str,
+        html_content: str,
+    ) -> dict[str, Any]:
+        if not api_key or not from_email:
+            return {"success": False, "message_id": None, "error": "Missing Resend configuration."}
+        payload = {
+            "from": from_email,
+            "to": [to_email],
+            "subject": subject,
+            "text": plain_text,
+            "html": html_content,
+        }
+        req = urllib_request.Request(
+            "https://api.resend.com/emails",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib_request.urlopen(req, timeout=20) as response:
+                body = response.read().decode("utf-8")
+                decoded = json.loads(body or "{}")
+                return {"success": True, "message_id": decoded.get("id"), "error": None}
+        except error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="ignore")
+            return {"success": False, "message_id": None, "error": f"Resend error: {exc.code} {body}"}
+        except Exception as exc:
+            return {"success": False, "message_id": None, "error": str(exc)}
+
 
 email_service = EmailService()
 
@@ -180,4 +224,22 @@ def send_pdf_delivery(
         pdf_download_url=pdf_download_url,
         pdf_bytes=pdf_bytes,
         document_id=document_id,
+    )
+
+
+def send_email_with_html(
+    api_key: str,
+    from_email: str,
+    to_email: str,
+    subject: str,
+    plain_text: str,
+    html_content: str,
+) -> dict[str, Any]:
+    return email_service.send_email_with_html(
+        api_key=api_key,
+        from_email=from_email,
+        to_email=to_email,
+        subject=subject,
+        plain_text=plain_text,
+        html_content=html_content,
     )

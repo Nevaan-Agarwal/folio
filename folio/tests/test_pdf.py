@@ -153,8 +153,8 @@ def _setup_service(monkeypatch):
         "send_pdf_delivery",
         lambda **kwargs: {"success": True, "message_id": "msg-pdf", "error": None},
     )
-    monkeypatch.setenv("SENDGRID_API_KEY", "test")
-    monkeypatch.setenv("SENDGRID_FROM_EMAIL", "noreply@folio.local")
+    monkeypatch.setenv("RESEND_API_KEY", "test")
+    monkeypatch.setenv("RESEND_FROM_EMAIL", "Folio <onboarding@resend.dev>")
     service = pdf_service.PdfService()
     return service, fake_db, fake_bucket
 

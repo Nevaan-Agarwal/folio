@@ -22,6 +22,7 @@ def _to_user_model(uid: str, data: dict | None) -> UserModel | None:
         firstName=data.get("firstName", ""),
         surname=data.get("surname", ""),
         email=data.get("email", ""),
+        passwordHash=data.get("passwordHash", ""),
         role=data.get("role", "employee"),
         language=data.get("language", "en"),
         disabled=bool(data.get("disabled", False)),
@@ -29,11 +30,14 @@ def _to_user_model(uid: str, data: dict | None) -> UserModel | None:
     )
 
 
-def create_user(uid: str, first_name: str, surname: str, email: str) -> UserModel:
+def create_user(
+    uid: str, first_name: str, surname: str, email: str, password_hash: str = ""
+) -> UserModel:
     payload = {
         "firstName": first_name,
         "surname": surname,
         "email": email,
+        "passwordHash": password_hash,
         "role": "employee",
         "language": "en",
         "disabled": False,
@@ -48,6 +52,16 @@ def get_user(uid: str) -> UserModel | None:
     if not doc.exists:
         return None
     return _to_user_model(uid, doc.to_dict())
+
+
+def get_user_by_email(email: str) -> UserModel | None:
+    normalized = (email or "").strip().lower()
+    if not normalized:
+        return None
+    docs = firebase_config.db.collection("users").where("email", "==", normalized).stream()
+    for doc in docs:
+        return _to_user_model(doc.id, doc.to_dict())
+    return None
 
 
 def update_user(uid: str, data: dict) -> None:

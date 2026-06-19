@@ -8,10 +8,6 @@ __pycache__/
 .env
 .env.*
 
-# Firebase credentials
-firebase-credentials*.json
-*firebase*credentials*.json
-
 # Virtual environments
 .venv/
 venv/

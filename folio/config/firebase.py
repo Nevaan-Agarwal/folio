@@ -1,95 +1,70 @@
-"""Firebase singleton initialization and shared clients."""
+"""Database/storage bootstrap module (PostgreSQL + local files)."""
 
 from __future__ import annotations
 
 import os
-from typing import Any
+from pathlib import Path
 
-from firebase_admin import auth, credentials, firestore, get_app, initialize_app, storage
+from config.document_store import init_document_store
 
 db = None
 bucket = None
-firebase_auth = None
+firebase_auth = None  # kept for backward-compatible imports, not used anymore
 
 
-def _validate_firebase_env(app) -> None:
-    """Log missing Firebase env configuration for easier deployment debugging."""
-    if app is None:
-        return
+class LocalBlob:
+    def __init__(self, root: Path, relative_path: str):
+        self._root = root
+        self.path = str(relative_path).replace("\\", "/")
+        self._absolute_path = (root / self.path).resolve()
 
-    credentials_path = os.getenv("FIREBASE_CREDENTIALS_PATH", "").strip()
-    storage_bucket = os.getenv("FIREBASE_STORAGE_BUCKET", "").strip()
-    project_id = os.getenv("FIREBASE_PROJECT_ID", "").strip()
+    @property
+    def public_url(self) -> str:
+        return self._absolute_path.as_uri()
 
-    missing_keys = []
-    if not credentials_path:
-        missing_keys.append("FIREBASE_CREDENTIALS_PATH")
-    if not storage_bucket:
-        missing_keys.append("FIREBASE_STORAGE_BUCKET")
+    def upload_from_file(self, file_stream, content_type=None):
+        self._absolute_path.parent.mkdir(parents=True, exist_ok=True)
+        file_stream.seek(0)
+        with self._absolute_path.open("wb") as handle:
+            handle.write(file_stream.read())
 
-    if missing_keys:
-        app.logger.warning("Missing Firebase config keys: %s", ", ".join(missing_keys))
+    def upload_from_string(self, data: bytes, content_type=None):
+        self._absolute_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = data if isinstance(data, (bytes, bytearray)) else str(data).encode("utf-8")
+        with self._absolute_path.open("wb") as handle:
+            handle.write(payload)
 
-    if credentials_path and not os.path.exists(credentials_path):
-        app.logger.warning(
-            "FIREBASE_CREDENTIALS_PATH points to missing file: %s",
-            credentials_path,
-        )
+    def download_as_bytes(self) -> bytes:
+        return self._absolute_path.read_bytes()
 
-    if not project_id:
-        app.logger.warning(
-            "FIREBASE_PROJECT_ID is empty; set it or provide a credentials file with project_id."
-        )
+    def generate_signed_url(self, expiration=None, method="GET", version="v4"):
+        return self.public_url
 
 
-def _build_options() -> dict[str, Any]:
-    options: dict[str, Any] = {}
+class LocalBucket:
+    def __init__(self, root: Path):
+        self._root = root
+        self._root.mkdir(parents=True, exist_ok=True)
+        self.name = str(root)
 
-    storage_bucket = os.getenv("FIREBASE_STORAGE_BUCKET", "").strip()
-    project_id = os.getenv("FIREBASE_PROJECT_ID", "").strip()
-
-    if storage_bucket:
-        options["storageBucket"] = storage_bucket
-    if project_id:
-        options["projectId"] = project_id
-    return options
+    def blob(self, relative_path: str) -> LocalBlob:
+        return LocalBlob(self._root, relative_path)
 
 
 def init_firebase(app=None) -> None:
-    """Initialize Firebase Admin SDK exactly once and expose shared clients."""
+    """Initialize PostgreSQL-backed document store and local file bucket."""
     global db, bucket, firebase_auth
 
     if app is not None:
-        for key in (
-            "FIREBASE_CREDENTIALS_PATH",
-            "FIREBASE_STORAGE_BUCKET",
-            "FIREBASE_PROJECT_ID",
-        ):
-            value = app.config.get(key)
-            if value:
-                os.environ.setdefault(key, str(value))
-        _validate_firebase_env(app)
+        database_url = app.config.get("DATABASE_URL")
+        if database_url:
+            os.environ.setdefault("DATABASE_URL", str(database_url))
+        storage_root = app.config.get("STORAGE_ROOT")
+        if storage_root:
+            os.environ.setdefault("STORAGE_ROOT", str(storage_root))
 
-    try:
-        try:
-            get_app()
-        except ValueError:
-            credentials_path = os.getenv("FIREBASE_CREDENTIALS_PATH", "").strip()
-            options = _build_options()
-            app_options = options or None
-
-            if credentials_path:
-                credential = credentials.Certificate(credentials_path)
-                initialize_app(credential, app_options)
-            else:
-                initialize_app(options=app_options)
-
-        db = firestore.client()
-        bucket = storage.bucket()
-        firebase_auth = auth
-    except Exception as exc:
-        db = None
-        bucket = None
-        firebase_auth = None
-        if app is not None:
-            app.logger.warning("Firebase initialization unavailable: %s", exc)
+    database_url = os.getenv("DATABASE_URL", "sqlite:///folio.db").strip() or "sqlite:///folio.db"
+    storage_root = Path(os.getenv("STORAGE_ROOT", "storage")).resolve()
+    db = init_document_store(database_url)
+    bucket = LocalBucket(storage_root)
+    firebase_auth = None

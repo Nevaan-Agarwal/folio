@@ -5,11 +5,13 @@ OCR extraction, AI analysis, document storage, and hospitality expense workflows
 
 ## Stack
 - Flask backend
-- Firebase Authentication, Firestore, Storage
+- PostgreSQL-backed document store (primary database)
+- Session auth stored in PostgreSQL
+- Local file storage for receipts and generated PDFs
 - Tesseract OCR + OpenCV preprocessing
 - OpenAI GPT-5.4 integration
 - ReportLab PDF generation
-- SendGrid email delivery
+- Resend email delivery
 - HTML/CSS/Vanilla JS frontend
 
 ## Quickstart
@@ -22,8 +24,16 @@ OCR extraction, AI analysis, document storage, and hospitality expense workflows
    ```bash
    cp .env.example .env
    ```
-4. Configure Firebase credentials and API keys in `.env`.
-5. Run development server:
+4. Configure required values in `.env`:
+   - `FLASK_SECRET_KEY`
+   - `APP_URL`
+   - `DATABASE_URL` (PostgreSQL)
+   - `STORAGE_ROOT` (local directory for uploaded files)
+   - `OPENAI_API_KEY`
+   - `RESEND_API_KEY`
+   - `RESEND_FROM_EMAIL`
+5. Ensure PostgreSQL is running and database exists.
+6. Run development server:
    ```bash
    flask --app app:create_app run
    ```
@@ -32,7 +42,7 @@ OCR extraction, AI analysis, document storage, and hospitality expense workflows
 The repository is organized into clear layers:
 - `routes/`: Flask blueprints
 - `services/`: Integrations (OCR, AI, PDF, email, storage)
-- `repositories/`: Firestore access
+- `repositories/`: data access layer (SQL-backed document store)
 - `middleware/`: auth and rate limiting
 - `models/`: domain entities
 - `utils/`: shared helpers
@@ -42,3 +52,27 @@ Run:
 ```bash
 pytest
 ```
+
+## PostgreSQL Setup (pgAdmin)
+1. Open pgAdmin and connect to your PostgreSQL server.
+2. Create a database (for example `folio`).
+3. Open Query Tool on that database and run `scripts/postgres_schema.sql`.
+4. Refresh `Schemas -> public -> Tables` to see:
+   - `users`
+   - `receipts`
+   - `forms`
+   - `combined_documents`
+   - `audit_logs`
+5. Run `scripts/postgres_smoke_test.sql` to execute a real write/read transaction.
+
+### Create tables through the app (alternative to pgAdmin script execution)
+If pgAdmin script execution is failing, run these from the project root:
+
+```bash
+flask --app app:create_app db-init
+flask --app app:create_app db-smoke
+```
+
+Expected output:
+- `db-init` -> schema applied successfully
+- `db-smoke` -> shows a created/read user row and audit row

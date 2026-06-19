@@ -10,6 +10,7 @@ class UserModel:
     firstName: str
     surname: str
     email: str
+    passwordHash: str = ""
     role: str = "employee"
     language: str = "en"
     disabled: bool = False

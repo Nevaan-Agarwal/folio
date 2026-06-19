@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import json
-import os
 import time
 from datetime import timedelta
-from urllib import error, request as urllib_request
+from uuid import uuid4
 
 from flask import (
     Blueprint,
@@ -17,8 +15,8 @@ from flask import (
     session,
     url_for,
 )
+from werkzeug.security import check_password_hash, generate_password_hash
 
-from config import firebase as firebase_config
 from middleware.auth_middleware import require_auth
 from middleware.rate_limiter import RATE_LIMITS, auth_rate_limit_key, limiter
 from repositories import audit_repository, user_repository
@@ -70,46 +68,20 @@ def _clear_failed_attempts(key: str) -> None:
     FAILED_LOGIN_ATTEMPTS.pop(key, None)
 
 
-def _firebase_sign_in(email: str, password: str) -> dict:
-    api_key = current_app.config.get("FIREBASE_WEB_API_KEY") or os.getenv(
-        "FIREBASE_WEB_API_KEY", ""
-    )
-    if not api_key:
-        raise RuntimeError("Missing FIREBASE_WEB_API_KEY")
-
-    endpoint = (
-        "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword"
-        f"?key={api_key}"
-    )
-    payload = json.dumps(
-        {"email": email, "password": password, "returnSecureToken": True}
-    ).encode("utf-8")
-    req = urllib_request.Request(
-        endpoint,
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-
-    try:
-        with urllib_request.urlopen(req, timeout=15) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except error.HTTPError as http_error:
-        body = http_error.read().decode("utf-8", errors="ignore")
-        message = "Invalid email or password."
-        if "INVALID_PASSWORD" in body or "EMAIL_NOT_FOUND" in body:
-            raise ValueError(message) from http_error
-        if "USER_DISABLED" in body:
-            raise ValueError("This account is disabled.") from http_error
-        raise ValueError(message) from http_error
-    except error.URLError as exc:
-        raise RuntimeError("Authentication service unavailable.") from exc
+def _create_session(user, remember_me: bool) -> None:
+    session["uid"] = user.id
+    session["email"] = user.email
+    session["role"] = user.role
+    session["lang"] = user.language
+    session["name"] = user.firstName
+    session["remember_me"] = remember_me
+    session.permanent = True
 
 
 def _send_password_reset_email(email: str, reset_link: str) -> None:
-    sendgrid_key = current_app.config.get("SENDGRID_API_KEY", "")
-    from_email = current_app.config.get("SENDGRID_FROM_EMAIL", "")
-    if not sendgrid_key or not from_email:
+    resend_key = current_app.config.get("RESEND_API_KEY", "")
+    from_email = current_app.config.get("RESEND_FROM_EMAIL", "")
+    if not resend_key or not from_email:
         return
 
     subject = "Reset your Folio password"
@@ -135,7 +107,7 @@ def _send_password_reset_email(email: str, reset_link: str) -> None:
     </div>
     """.strip()
     email_service.send_email_with_html(
-        api_key=sendgrid_key,
+        api_key=resend_key,
         from_email=from_email,
         to_email=email,
         subject=subject,
@@ -175,9 +147,9 @@ def forgot_password():
 
     # Always return the same success response to avoid account enumeration.
     success_message = "If that email exists, you'll receive a link shortly"
-    if validate_email(email) and firebase_config.firebase_auth is not None:
+    if validate_email(email):
         try:
-            link = firebase_config.firebase_auth.generate_password_reset_link(email)
+            link = f"{current_app.config.get('APP_URL', 'http://localhost:5000').rstrip('/')}/auth/login"
             _send_password_reset_email(email=email, reset_link=link)
             audit_repository.create_log(
                 user_id=None,
@@ -227,52 +199,33 @@ def register():
         flash("Please fix the highlighted registration fields.", "error")
         return redirect(url_for("auth.register_page"))
 
-    if firebase_config.firebase_auth is None:
-        message = "Authentication service unavailable."
+    existing = user_repository.get_user_by_email(email)
+    if existing is not None:
+        error_payload = {"email": "An account with this email already exists."}
         if _wants_json_response():
-            return jsonify({"status": "error", "errors": {"auth": message}}), 503
-        flash(message, "error")
+            return jsonify({"status": "error", "errors": error_payload}), 409
+        flash(error_payload["email"], "error")
         return redirect(url_for("auth.register_page"))
 
-    try:
-        created_user = firebase_config.firebase_auth.create_user(
-            email=email,
-            password=password,
-            display_name=f"{first_name} {surname}".strip(),
-        )
-    except Exception as exc:
-        exc_name = type(exc).__name__
-        message = str(exc)
-        if "EmailAlreadyExists" in exc_name or "already exists" in message.lower():
-            error_payload = {"email": "An account with this email already exists."}
-            if _wants_json_response():
-                return jsonify({"status": "error", "errors": error_payload}), 409
-            flash(error_payload["email"], "error")
-            return redirect(url_for("auth.register_page"))
-
-        if _wants_json_response():
-            return jsonify({"status": "error", "errors": {"auth": message}}), 500
-        flash("Registration failed. Please try again.", "error")
-        return redirect(url_for("auth.register_page"))
+    created_uid = str(uuid4())
+    password_hash = generate_password_hash(password)
 
     user_repository.create_user(
-        uid=created_user.uid,
+        uid=created_uid,
         first_name=first_name,
         surname=surname,
         email=email,
+        password_hash=password_hash,
     )
     audit_repository.create_log(
-        user_id=created_user.uid,
+        user_id=created_uid,
         action="user_registered",
         details={"email": email},
         request=request,
     )
 
-    session["uid"] = created_user.uid
-    session["email"] = email
-    session["name"] = first_name
-    session["role"] = "employee"
-    session["lang"] = "en"
+    created_user = user_repository.get_user(created_uid)
+    _create_session(created_user, remember_me=False)
 
     flash("Registration successful. Welcome to Folio!", "success")
     redirect_url = url_for("auth.dashboard")
@@ -315,40 +268,19 @@ def login():
         flash(message, "error")
         return redirect(url_for("auth.login_page"))
 
-    if firebase_config.firebase_auth is None:
-        message = "Authentication service unavailable."
-        if _wants_json_response():
-            return jsonify({"status": "error", "errors": {"auth": message}}), 503
-        flash(message, "error")
-        return redirect(url_for("auth.login_page"))
-
-    try:
-        sign_in_payload = _firebase_sign_in(email=email, password=password)
-        id_token = sign_in_payload.get("idToken")
-        if not id_token:
-            raise ValueError("Invalid email or password.")
-        decoded_token = firebase_config.firebase_auth.verify_id_token(id_token)
-    except ValueError as exc:
-        _record_failed_attempt(client_key)
-        if _wants_json_response():
-            return jsonify({"status": "error", "errors": {"auth": str(exc)}}), 401
-        flash(str(exc), "error")
-        return redirect(url_for("auth.login_page"))
-    except Exception:
-        _record_failed_attempt(client_key)
-        message = "Authentication service unavailable."
-        if _wants_json_response():
-            return jsonify({"status": "error", "errors": {"auth": message}}), 503
-        flash(message, "error")
-        return redirect(url_for("auth.login_page"))
-
-    uid = decoded_token.get("uid")
-    user = user_repository.get_user(uid) if uid else None
+    user = user_repository.get_user_by_email(email)
     if user is None:
         _record_failed_attempt(client_key)
-        message = "User profile not found."
+        message = "Invalid email or password."
         if _wants_json_response():
-            return jsonify({"status": "error", "errors": {"auth": message}}), 403
+            return jsonify({"status": "error", "errors": {"auth": message}}), 401
+        flash(message, "error")
+        return redirect(url_for("auth.login_page"))
+    if not user.passwordHash or not check_password_hash(user.passwordHash, password):
+        _record_failed_attempt(client_key)
+        message = "Invalid email or password."
+        if _wants_json_response():
+            return jsonify({"status": "error", "errors": {"auth": message}}), 401
         flash(message, "error")
         return redirect(url_for("auth.login_page"))
     if user.disabled:
@@ -360,13 +292,7 @@ def login():
         return redirect(url_for("auth.login_page"))
 
     _clear_failed_attempts(client_key)
-    session["uid"] = uid
-    session["email"] = user.email
-    session["role"] = user.role
-    session["lang"] = user.language
-    session["name"] = user.firstName
-    session["remember_me"] = remember_me
-    session.permanent = True
+    _create_session(user, remember_me=remember_me)
 
     if remember_me:
         current_app.permanent_session_lifetime = timedelta(days=30)
@@ -375,7 +301,7 @@ def login():
 
     redirect_url = url_for("auth.dashboard")
     audit_repository.create_log(
-        user_id=uid,
+        user_id=user.id,
         action="user_login",
         details={"email": email},
         request=request,
@@ -444,12 +370,8 @@ def settings():
 
     if action == "password_reset":
         message = "A password reset link has been sent to your email"
-        if firebase_config.firebase_auth is not None:
-            try:
-                link = firebase_config.firebase_auth.generate_password_reset_link(user.email)
-                _send_password_reset_email(email=user.email, reset_link=link)
-            except Exception:
-                pass
+        link = f"{current_app.config.get('APP_URL', 'http://localhost:5000').rstrip('/')}/auth/login"
+        _send_password_reset_email(email=user.email, reset_link=link)
         return jsonify({"status": "ok", "message": message}), 200
 
     return jsonify({"status": "error", "message": "Unsupported settings action."}), 400
@@ -467,27 +389,12 @@ def set_language():
     session["lang"] = lang
     saved_to_profile = False
 
-    auth_header = request.headers.get("Authorization", "")
-    token = auth_header.removeprefix("Bearer ").strip() if auth_header else ""
     user_id = session.get("uid")
 
-    if user_id and firebase_config.db is not None:
+    if user_id:
         try:
-            firebase_config.db.collection("users").document(user_id).set(
-                {"language": lang}, merge=True
-            )
+            user_repository.update_user(user_id, {"language": lang})
             saved_to_profile = True
-        except Exception:
-            saved_to_profile = False
-    elif token and firebase_config.firebase_auth is not None and firebase_config.db is not None:
-        try:
-            decoded = firebase_config.firebase_auth.verify_id_token(token)
-            token_uid = decoded.get("uid")
-            if token_uid:
-                firebase_config.db.collection("users").document(token_uid).set(
-                    {"language": lang}, merge=True
-                )
-                saved_to_profile = True
         except Exception:
             saved_to_profile = False
 

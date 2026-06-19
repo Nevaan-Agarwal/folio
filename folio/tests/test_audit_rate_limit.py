@@ -3,6 +3,7 @@ from io import BytesIO
 from types import SimpleNamespace
 
 from app import create_app
+from middleware import rate_limiter as rate_limiter_module
 from models.user import UserModel
 from repositories import audit_repository
 from routes import auth as auth_routes
@@ -23,6 +24,7 @@ def _make_upload_payload(filename: str, content: bytes):
 
 def test_login_creates_audit_log(monkeypatch):
     app = create_app("testing")
+    rate_limiter_module.limiter.reset()
     captured = []
     monkeypatch.setattr(auth_routes, "_firebase_sign_in", lambda email, password: {"idToken": "token"})
     monkeypatch.setattr(

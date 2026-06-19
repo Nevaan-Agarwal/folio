@@ -1,7 +1,9 @@
 """Application entry point for Folio."""
 
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
+import click
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 
 from config import firebase as firebase_config
@@ -15,6 +17,7 @@ from routes.documents import documents_bp
 from routes.forms import forms_bp
 from routes.pdf import pdf_bp
 from routes.receipts import receipts_bp
+from utils.db_bootstrap import run_smoke_transaction, run_sql_file
 from utils.helpers import get_current_language, translate
 
 
@@ -78,20 +81,20 @@ def create_app(config_name: str | None = None) -> Flask:
         now = datetime.now(timezone.utc).isoformat()
         try:
             if firebase_config.db is None:
-                raise RuntimeError("Firestore client unavailable")
+                raise RuntimeError("Database client unavailable")
             doc = (
                 firebase_config.db.collection("_healthchecks")
-                .document("firebase-connection")
+                .document("db-connection")
                 .get()
             )
             _ = doc.exists
             return jsonify(
-                {"status": "ok", "firebase": "connected", "timestamp": now}
+                {"status": "ok", "database": "connected", "timestamp": now}
             )
         except Exception:
             return (
                 jsonify(
-                    {"status": "error", "firebase": "unavailable", "timestamp": now}
+                    {"status": "error", "database": "unavailable", "timestamp": now}
                 ),
                 503,
             )
@@ -113,6 +116,44 @@ def create_app(config_name: str | None = None) -> Flask:
             ),
             429,
         )
+
+    @app.cli.command("db-init")
+    @click.option(
+        "--schema",
+        "schema_path",
+        default="scripts/postgres_schema.sql",
+        show_default=True,
+        help="Path to SQL schema file",
+    )
+    def db_init_command(schema_path: str):
+        schema = Path(schema_path)
+        if not schema.exists():
+            raise click.ClickException(f"Schema file not found: {schema}")
+        database_url = app.config.get("DATABASE_URL", "sqlite:///folio.db")
+        try:
+            run_sql_file(database_url=database_url, sql_file_path=str(schema))
+            click.echo(f"Schema applied successfully to {database_url}")
+        except Exception as exc:
+            raise click.ClickException(f"Failed to apply schema: {exc}") from exc
+
+    @app.cli.command("db-smoke")
+    @click.option(
+        "--user-id",
+        default="smoke_user_001",
+        show_default=True,
+        help="User ID used for smoke transaction",
+    )
+    def db_smoke_command(user_id: str):
+        database_url = app.config.get("DATABASE_URL", "sqlite:///folio.db")
+        try:
+            result = run_smoke_transaction(database_url=database_url, user_id=user_id)
+            click.echo(
+                "Smoke transaction succeeded.\n"
+                f"User row: {result['user']}\n"
+                f"Audit row: {result['audit']}"
+            )
+        except Exception as exc:
+            raise click.ClickException(f"Smoke transaction failed: {exc}") from exc
 
     return app
 
