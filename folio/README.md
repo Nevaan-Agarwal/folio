@@ -65,13 +65,16 @@ pytest
    - `audit_logs`
 5. Run `scripts/postgres_smoke_test.sql` to execute a real write/read transaction.
 
-### Create tables through the app (alternative to pgAdmin script execution)
-If pgAdmin script execution is failing, run these from the project root:
+### Create tables through the app
+For local SQLite development, run these from the project root:
 
 ```bash
 flask --app app:create_app db-init
 flask --app app:create_app db-smoke
 ```
+
+For PostgreSQL, set `DATABASE_URL` first. The `db-init` command will then use
+`scripts/postgres_schema.sql` instead of the local SQLite schema.
 
 Expected output:
 - `db-init` -> schema applied successfully

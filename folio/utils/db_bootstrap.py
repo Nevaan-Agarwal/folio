@@ -22,9 +22,19 @@ def _normalize_sqlite_path(database_url: str) -> str:
     return database_url
 
 
+def is_postgres_url(database_url: str) -> bool:
+    return database_url.startswith("postgresql://") or database_url.startswith("postgres://")
+
+
+def default_schema_path(database_url: str) -> str:
+    if is_postgres_url(database_url):
+        return "scripts/postgres_schema.sql"
+    return "scripts/sqlite_schema.sql"
+
+
 @contextmanager
 def _connect(database_url: str):
-    if database_url.startswith("postgresql://") or database_url.startswith("postgres://"):
+    if is_postgres_url(database_url):
         if psycopg is None:
             raise RuntimeError(
                 "PostgreSQL URL configured but psycopg is not installed. "

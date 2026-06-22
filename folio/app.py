@@ -17,7 +17,7 @@ from routes.documents import documents_bp
 from routes.forms import forms_bp
 from routes.pdf import pdf_bp
 from routes.receipts import receipts_bp
-from utils.db_bootstrap import run_smoke_transaction, run_sql_file
+from utils.db_bootstrap import default_schema_path, run_smoke_transaction, run_sql_file
 from utils.helpers import get_current_language, translate
 
 
@@ -121,15 +121,16 @@ def create_app(config_name: str | None = None) -> Flask:
     @click.option(
         "--schema",
         "schema_path",
-        default="scripts/postgres_schema.sql",
-        show_default=True,
+        default=None,
+        show_default="database-specific",
         help="Path to SQL schema file",
     )
-    def db_init_command(schema_path: str):
-        schema = Path(schema_path)
+    def db_init_command(schema_path: str | None):
+        database_url = app.config.get("DATABASE_URL", "sqlite:///folio.db")
+        selected_schema_path = schema_path or default_schema_path(database_url)
+        schema = Path(selected_schema_path)
         if not schema.exists():
             raise click.ClickException(f"Schema file not found: {schema}")
-        database_url = app.config.get("DATABASE_URL", "sqlite:///folio.db")
         try:
             run_sql_file(database_url=database_url, sql_file_path=str(schema))
             click.echo(f"Schema applied successfully to {database_url}")
