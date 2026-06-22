@@ -45,7 +45,7 @@
 <section class="form-review-layout" data-form-id="{{ form.id }}" data-receipt-id="{{ form.receiptId }}" data-read-only="{{ 'true' if form.isReadOnly else 'false' }}">
   <aside class="card">
     <div class="receipt-thumb-wrap">
-      <img class="receipt-thumb" src="{{ receipt.imageUrl if receipt else '' }}" alt="Receipt preview" />
+      <img class="receipt-thumb" src="{{ url_for('receipts.receipt_image', receipt_id=receipt.id) if receipt else '' }}" alt="Receipt preview" />
     </div>
     <p class="ocr-label">Original Receipt</p>
 
@@ -81,7 +81,7 @@
         <div class="field-row" data-field="expenseCategory">
           <div class="field-label-line"><label>Expense Category</label></div>
           <select class="input-field" name="expenseCategory" {% if form.isReadOnly %}disabled{% endif %}>
-            {% for category in ['Restaurant','Business Meal','Client Meeting','Travel','Hotel','Transportation','Office Supplies','Entertainment','Training','Other'] %}
+            {% for category in ['Restaurant','Business Meal','Client Meeting','Travel','Hotel','Transportation','Office Supplies','Entertainment','Training/Workshop','Other'] %}
             <option value="{{ category }}" {% if form.expenseCategory == category %}selected{% endif %}>{{ category }}</option>
             {% endfor %}
           </select>
@@ -167,7 +167,7 @@
           {% if form.emailDeliveryStatus == 'sent' %}
           <span class="email-icon">✉</span><span>Sent to {{ form.documentEmail or 'your email' }}</span>
           {% elif form.emailDeliveryStatus == 'failed' %}
-          <span class="email-icon">✉</span><span>Delivery failed</span>
+          <span class="email-icon">✉</span><span>Delivery failed{% if form.emailError %}: {{ form.emailError }}{% endif %}</span>
           {% else %}
           <span class="email-icon">✉</span><span>Delivery pending...</span>
           {% endif %}
@@ -176,7 +176,7 @@
         <button class="btn-secondary" type="button" id="resendEmailBtn">Resend</button>
         {% endif %}
         {% if form.pdfGenerated %}
-        <a class="btn-primary" href="{{ url_for('pdf.pdf_status') }}">Download PDF</a>
+        <a class="btn-primary" href="{{ form.documentPdfUrl }}?download=1">Download PDF</a>
         {% endif %}
         {% if not form.isReadOnly %}
         <button class="btn-secondary" type="button" id="saveDraftBtn">Save Draft</button>

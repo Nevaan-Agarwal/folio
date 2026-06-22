@@ -6,13 +6,38 @@ from datetime import datetime, timezone
 
 from config import firebase as firebase_config
 from models.form import FormModel
-from repositories import receipt_repository
+from repositories import audit_repository, receipt_repository
 
 
 def save_form(form_data: dict) -> str:
-    ref = firebase_config.db.collection("forms").document()
-    ref.set(form_data)
-    return ref.id
+    user_id = str((form_data or {}).get("userId") or "system")
+    try:
+        ref = firebase_config.db.collection("forms").document()
+        ref.set(form_data)
+        audit_repository.create_log(
+            user_id=user_id,
+            action="db_transaction",
+            details={
+                "status": "success",
+                "operation": "create",
+                "collection": "forms",
+                "docId": ref.id,
+            },
+        )
+        return ref.id
+    except Exception as exc:
+        audit_repository.create_log(
+            user_id=user_id,
+            action="db_transaction",
+            details={
+                "status": "failed",
+                "operation": "create",
+                "collection": "forms",
+                "docId": "",
+                "error": str(exc),
+            },
+        )
+        raise
 
 
 def _parse_datetime(value):
@@ -98,9 +123,35 @@ def create_form_from_ai_result(
         "createdAt": now_iso,
         "updatedAt": now_iso,
     }
-    ref = firebase_config.db.collection("forms").document(receipt_id)
-    ref.set(payload, merge=True)
-    return ref.id
+    try:
+        ref = firebase_config.db.collection("forms").document(receipt_id)
+        ref.set(payload, merge=True)
+        if not ref.get().exists:
+            raise RuntimeError("Failed to persist generated form.")
+        audit_repository.create_log(
+            user_id=user_id or "system",
+            action="db_transaction",
+            details={
+                "status": "success",
+                "operation": "upsert",
+                "collection": "forms",
+                "docId": ref.id,
+            },
+        )
+        return ref.id
+    except Exception as exc:
+        audit_repository.create_log(
+            user_id=user_id or "system",
+            action="db_transaction",
+            details={
+                "status": "failed",
+                "operation": "upsert",
+                "collection": "forms",
+                "docId": str(receipt_id or ""),
+                "error": str(exc),
+            },
+        )
+        raise
 
 
 def get_form(form_id: str) -> FormModel | None:
@@ -120,7 +171,32 @@ def get_form_by_receipt(receipt_id: str) -> FormModel | None:
 def update_form(form_id: str, data: dict) -> None:
     payload = dict(data)
     payload["updatedAt"] = datetime.now(timezone.utc).isoformat()
-    firebase_config.db.collection("forms").document(form_id).set(payload, merge=True)
+    user_id = str(payload.get("userId") or "system")
+    try:
+        firebase_config.db.collection("forms").document(form_id).set(payload, merge=True)
+        audit_repository.create_log(
+            user_id=user_id,
+            action="db_transaction",
+            details={
+                "status": "success",
+                "operation": "update",
+                "collection": "forms",
+                "docId": form_id,
+            },
+        )
+    except Exception as exc:
+        audit_repository.create_log(
+            user_id=user_id,
+            action="db_transaction",
+            details={
+                "status": "failed",
+                "operation": "update",
+                "collection": "forms",
+                "docId": form_id,
+                "error": str(exc),
+            },
+        )
+        raise
 
 
 def approve_form(form_id: str, data: dict | None = None) -> None:
@@ -145,3 +221,33 @@ def reject_form(form_id: str, reason: str) -> None:
         form.receiptId,
         {"reviewStatus": "rejected", "processingStatus": "uploaded"},
     )
+
+
+def delete_form(form_id: str) -> None:
+    if firebase_config.db is None:
+        return
+    try:
+        firebase_config.db.collection("forms").document(form_id).delete()
+        audit_repository.create_log(
+            user_id="system",
+            action="db_transaction",
+            details={
+                "status": "success",
+                "operation": "delete",
+                "collection": "forms",
+                "docId": form_id,
+            },
+        )
+    except Exception as exc:
+        audit_repository.create_log(
+            user_id="system",
+            action="db_transaction",
+            details={
+                "status": "failed",
+                "operation": "delete",
+                "collection": "forms",
+                "docId": form_id,
+                "error": str(exc),
+            },
+        )
+        raise

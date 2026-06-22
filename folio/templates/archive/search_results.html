@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Search Results - {{ t('app.name') }}{% endblock %}
+{% block page_title %}Search{% endblock %}
+
+{% block head_extra %}
+<style>
+  .search-head { margin-bottom: 14px; }
+  .search-head h2 { margin: 0; }
+  .search-head p { margin: 6px 0 0; color: var(--text-secondary); }
+  .search-list {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+  }
+  .search-row {
+    display: grid;
+    grid-template-columns: 46px 1fr auto auto auto;
+    gap: 10px;
+    align-items: center;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-default);
+  }
+  .search-row:last-child { border-bottom: 0; }
+  .search-thumb {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--border-default);
+    background: var(--bg-primary);
+  }
+  .search-meta p { margin: 0; }
+  .search-meta .merchant { color: var(--text-primary); font-weight: 600; }
+  .search-meta .date { color: var(--text-muted); font-size: 12px; }
+  .search-cat {
+    color: var(--text-secondary);
+    border: 1px solid var(--border-default);
+    border-radius: 999px;
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  .search-amount { color: var(--warning); font-weight: 700; }
+  .search-status { color: var(--text-secondary); font-size: 12px; }
+  .search-view { color: var(--accent-primary); text-decoration: none; }
+  .search-empty {
+    border: 1px dashed var(--border-default);
+    border-radius: var(--radius-xl);
+    padding: 24px;
+    text-align: center;
+    color: var(--text-secondary);
+  }
+  @media (max-width: 960px) {
+    .search-row { grid-template-columns: 40px 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="search-head">
+  <h2>Search Results</h2>
+  <p>
+    {% if query %}
+      Showing {{ total }} result(s) for "<strong>{{ query }}</strong>"
+    {% else %}
+      Enter a term in the global search bar to find receipts and reports.
+    {% endif %}
+  </p>
+</section>
+
+{% if results %}
+<section class="search-list">
+  {% for item in results %}
+  <article class="search-row">
+    <img class="search-thumb" src="{{ item.thumbnail }}" alt="receipt thumb" />
+    <div class="search-meta">
+      <p class="merchant">{{ item.merchant }}</p>
+      <p class="date">{{ item.date or '-' }}</p>
+    </div>
+    <span class="search-cat">{{ item.category }}</span>
+    <span class="search-amount">€ {{ "%.2f"|format(item.amount or 0) }}</span>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span class="search-status">{{ item.status }}</span>
+      <a class="search-view" href="{{ item.link }}">View →</a>
+    </div>
+  </article>
+  {% endfor %}
+</section>
+{% else %}
+<section class="search-empty">
+  <p style="margin:0;">No results found{% if query %} for "{{ query }}"{% endif %}.</p>
+</section>
+{% endif %}
+{% endblock %}

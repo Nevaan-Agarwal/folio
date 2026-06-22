@@ -19,4 +19,5 @@ class CombinedDocumentModel:
     emailSentAt: str | None = None
     emailMessageId: str | None = None
     emailDeliveryStatus: str = "pending"
+    emailError: str | None = None
     userEmail: str = ""

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Access Forbidden - {{ t('app.name') }}{% endblock %}
+{% block page_title %}Access Restricted{% endblock %}
+
+{% block head_extra %}
+<style>
+  .forbidden-wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    text-align: center;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-xl);
+    background: linear-gradient(180deg, var(--bg-elevated), var(--bg-primary));
+    padding: 28px 24px;
+  }
+  .forbidden-code {
+    font-size: 52px;
+    line-height: 1;
+    font-weight: 800;
+    color: var(--warning);
+    margin: 0 0 6px;
+  }
+  .forbidden-title {
+    margin: 0 0 10px;
+    color: var(--text-primary);
+  }
+  .forbidden-text {
+    margin: 0 auto 18px;
+    max-width: 540px;
+    color: var(--text-secondary);
+  }
+  .forbidden-actions {
+    display: inline-flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="card forbidden-wrap">
+  <p class="forbidden-code">403</p>
+  <h2 class="forbidden-title">This page is restricted</h2>
+  <p class="forbidden-text">
+    You do not currently have permission to view this admin area. If you need access,
+    contact your Folio administrator.
+  </p>
+  <div class="forbidden-actions">
+    <a class="btn-primary" href="{{ url_for('auth.dashboard') }}">Go to Dashboard</a>
+    <a class="btn-secondary" href="{{ url_for('archive.employee_archive') }}">View My Archive</a>
+  </div>
+</section>
+{% endblock %}

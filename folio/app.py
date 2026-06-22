@@ -9,10 +9,12 @@ from flask import Flask, jsonify, redirect, render_template, request, session, u
 from config import firebase as firebase_config
 from config.settings import get_config
 from middleware.rate_limiter import create_limiter
+from repositories import audit_repository, user_repository
 from routes.admin import admin_bp
-from routes.api import api_bp
+from routes.api import api_bp, search_bp
 from routes.archive import archive_bp
 from routes.auth import auth_bp
+from routes.dashboard import dashboard_bp
 from routes.documents import documents_bp
 from routes.forms import forms_bp
 from routes.pdf import pdf_bp
@@ -32,6 +34,7 @@ def create_app(config_name: str | None = None) -> Flask:
     firebase_config.init_firebase(app)
 
     app.register_blueprint(auth_bp, url_prefix="/auth")
+    app.register_blueprint(dashboard_bp, url_prefix="")
     app.register_blueprint(receipts_bp, url_prefix="/receipts")
     app.register_blueprint(forms_bp, url_prefix="/forms")
     app.register_blueprint(documents_bp, url_prefix="")
@@ -39,6 +42,7 @@ def create_app(config_name: str | None = None) -> Flask:
     app.register_blueprint(archive_bp, url_prefix="/archive")
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(api_bp, url_prefix="/api")
+    app.register_blueprint(search_bp, url_prefix="")
 
     @app.before_request
     def configure_session():
@@ -61,10 +65,6 @@ def create_app(config_name: str | None = None) -> Flask:
     @app.get("/logout")
     def logout_alias():
         return redirect(url_for("auth.logout"))
-
-    @app.get("/dashboard")
-    def dashboard_alias():
-        return redirect(url_for("auth.dashboard"))
 
     @app.route("/settings", methods=["GET", "POST"])
     def settings_alias():
@@ -117,6 +117,17 @@ def create_app(config_name: str | None = None) -> Flask:
             429,
         )
 
+    @app.errorhandler(403)
+    def handle_forbidden(_error):
+        accepts_json = (
+            request.path.startswith("/api")
+            or request.headers.get("X-Requested-With") == "XMLHttpRequest"
+            or "application/json" in (request.headers.get("Accept") or "")
+        )
+        if accepts_json:
+            return jsonify({"success": False, "error": "Forbidden"}), 403
+        return render_template("errors/403.html"), 403
+
     @app.cli.command("db-init")
     @click.option(
         "--schema",
@@ -154,6 +165,62 @@ def create_app(config_name: str | None = None) -> Flask:
             )
         except Exception as exc:
             raise click.ClickException(f"Smoke transaction failed: {exc}") from exc
+
+    @app.cli.command("make-admin")
+    @click.option(
+        "--email",
+        required=True,
+        help="Email address of the user to promote to admin.",
+    )
+    @click.option(
+        "--dry-run",
+        is_flag=True,
+        default=False,
+        help="Validate target user without applying changes.",
+    )
+    def make_admin_command(email: str, dry_run: bool):
+        normalized_email = (email or "").strip().lower()
+        if not normalized_email:
+            raise click.ClickException("A valid --email value is required.")
+
+        target_user = user_repository.get_user_by_email(normalized_email)
+        if target_user is None:
+            raise click.ClickException(
+                f"User not found for email: {normalized_email}"
+            )
+        if target_user.disabled:
+            raise click.ClickException(
+                f"User {normalized_email} is deactivated. Reactivate before promotion."
+            )
+        if target_user.role == "admin":
+            click.echo(f"User {normalized_email} is already an admin.")
+            return
+        if target_user.role != "employee":
+            raise click.ClickException(
+                f"User {normalized_email} has unsupported role: {target_user.role}"
+            )
+
+        if dry_run:
+            click.echo(
+                f"[dry-run] User {normalized_email} would be promoted to admin."
+            )
+            return
+
+        user_repository.update_user(target_user.id, {"role": "admin"})
+        audit_repository.create_log(
+            user_id="system_cli",
+            action="user_promoted_to_admin",
+            details={
+                "targetUser": target_user.id,
+                "targetEmail": normalized_email,
+                "previousRole": "employee",
+                "newRole": "admin",
+                "source": "cli_make_admin",
+            },
+        )
+        click.echo(
+            f"User {normalized_email} promoted to admin successfully."
+        )
 
     return app
 

@@ -132,7 +132,6 @@
   const uploadNowBtn = document.getElementById("uploadNowBtn");
   const progressWrap = document.getElementById("uploadProgress");
   const progressFill = document.getElementById("uploadProgressFill");
-  const toastContainer = document.getElementById("uploadToastContainer");
   const tabs = document.querySelectorAll("[data-tab]");
   const panes = document.querySelectorAll("[data-pane]");
   const cameraPreview = document.getElementById("cameraPreview");
@@ -146,17 +145,11 @@
   let stream = null;
   let activeTab = "file";
 
-  function showToast(title, message) {
-    if (!toastContainer) return;
-    const toast = document.createElement("article");
-    toast.className = "toast";
-    toast.innerHTML = '<p class="toast-title"></p><p class="toast-message"></p>';
-    toast.querySelector(".toast-title").textContent = title;
-    toast.querySelector(".toast-message").textContent = message;
-    toastContainer.appendChild(toast);
-    setTimeout(function () {
-      toast.remove();
-    }, 3500);
+  function showToast(message, type, duration) {
+    if (window.showToast) {
+      window.showToast(message, type || "info", duration || 4000);
+      return;
+    }
   }
 
   function bytesToMb(bytes) {
@@ -182,7 +175,7 @@
 
   function uploadSelectedFile(file) {
     if (!file) {
-      showToast("Upload error", "Please select or capture a receipt image.");
+      showToast("Please select or capture a receipt image.", "warning");
       return;
     }
 
@@ -208,18 +201,21 @@
       }
 
       if (xhr.status >= 200 && xhr.status < 300 && response.receiptId) {
-        window.location.assign("/receipts/" + response.receiptId + "/processing");
+        showToast("Upload complete!", "success", 2200);
+        window.setTimeout(function () {
+          window.location.assign("/receipts/" + response.receiptId + "/processing");
+        }, 250);
         return;
       }
 
       const message = response.message || "Receipt upload failed. Please try again.";
-      showToast("Upload error", message);
+      showToast(message, "error");
       progressWrap.hidden = true;
       progressFill.style.width = "0%";
     });
 
     xhr.addEventListener("error", function () {
-      showToast("Upload error", "Network error while uploading receipt.");
+      showToast("Network error while uploading receipt.", "error");
       progressWrap.hidden = true;
       progressFill.style.width = "0%";
     });

@@ -41,7 +41,7 @@
 
 <section class="doc-layout">
   <article class="card">
-    <img class="doc-receipt-img" src="{{ receipt.imageUrl }}" alt="Original receipt" />
+    <img class="doc-receipt-img" src="{{ url_for('receipts.receipt_image', receipt_id=receipt.id) }}" alt="Original receipt" />
     <div class="confidence-wrap" style="margin-top:10px;">
       <svg class="confidence-ring" viewBox="0 0 120 120">
         <circle class="confidence-ring-bg" cx="60" cy="60" r="52"></circle>
@@ -109,8 +109,8 @@
     <p class="settings-note">Created: {{ document.createdAt or '-' }}</p>
 
     <div class="doc-actions-stack">
-      <a class="btn-primary" href="{{ document.downloadUrl }}" download>Download PDF</a>
-      <a class="btn-secondary" href="{{ document.downloadUrl }}" target="_blank" rel="noopener">Preview PDF</a>
+      <a class="btn-primary" href="{{ documentPdfUrl }}?download=1">Download PDF</a>
+      <a class="btn-secondary" href="{{ documentPdfUrl }}" target="_blank" rel="noopener">Preview PDF</a>
     </div>
 
     <p class="doc-label" style="margin-top:14px;">Email Delivery Status</p>
@@ -119,6 +119,9 @@
     <p class="settings-note">Sent at {{ document.emailSentAt or '-' }}</p>
     {% elif document.emailDeliveryStatus == "failed" %}
     <span class="email-badge email-failed">Delivery failed</span>
+    {% if document.emailError %}
+    <p class="settings-note" style="margin-top:6px;">{{ document.emailError }}</p>
+    {% endif %}
     {% else %}
     <span class="email-badge email-pending">Delivery pending...</span>
     {% endif %}
@@ -156,6 +159,8 @@
           if (response.ok) {
             window.location.reload();
           } else {
+            const payload = await response.json().catch(function () { return {}; });
+            window.alert(payload.error || "Resend failed.");
             resendBtn.textContent = "Resend Email";
             resendBtn.classList.remove("resend-loading");
           }
@@ -168,8 +173,29 @@
 
     const deleteBtn = document.getElementById("deleteSubmissionBtn");
     if (deleteBtn) {
-      deleteBtn.addEventListener("click", function () {
-        window.alert("Deletion endpoint is not enabled yet.");
+      deleteBtn.addEventListener("click", async function () {
+        const confirmed = window.confirm("Delete this submission permanently? This action cannot be undone.");
+        if (!confirmed) return;
+        deleteBtn.disabled = true;
+        deleteBtn.textContent = "Deleting...";
+        try {
+          const response = await fetch("/documents/{{ document.id }}/delete", {
+            method: "POST",
+            headers: { Accept: "application/json" },
+          });
+          const payload = await response.json().catch(function () { return {}; });
+          if (!response.ok || !payload.success) {
+            window.alert(payload.error || "Delete failed.");
+            deleteBtn.disabled = false;
+            deleteBtn.textContent = "Delete Submission";
+            return;
+          }
+          window.location.href = "/archive";
+        } catch (_error) {
+          deleteBtn.disabled = false;
+          deleteBtn.textContent = "Delete Submission";
+          window.alert("Delete failed.");
+        }
       });
     }
   })();

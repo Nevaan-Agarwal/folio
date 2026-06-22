@@ -14,7 +14,7 @@ class BaseConfig:
     SESSION_COOKIE_SECURE = False
     PERMANENT_SESSION_LIFETIME = timedelta(hours=8)
 
-    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///folio.db")
+    DATABASE_URL = os.getenv("DATABASE_URL", "")
     STORAGE_ROOT = os.getenv("STORAGE_ROOT", "storage")
 
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
@@ -46,6 +46,7 @@ class TestingConfig(BaseConfig):
     TESTING = True
     DEBUG = False
     ENV = "testing"
+    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///folio_test.db")
 
 
 CONFIG_MAP = {

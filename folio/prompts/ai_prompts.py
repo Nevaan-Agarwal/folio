@@ -15,6 +15,8 @@ Your job is to:
 CRITICAL RULES:
 - Never hallucinate or guess data that is not present in the OCR text
 - If a field cannot be determined: return null for that field
+- Use receipt conventions and nearby labels to extract as many fields as possible
+- Infer structured values when explicitly derivable (for example date formats or EUR symbols)
 - Amounts must always be numbers (float), never strings
 - Dates must be in ISO format: YYYY-MM-DD
 - The missingFields array must list every field that returned null
@@ -22,7 +24,7 @@ CRITICAL RULES:
 
 EXPENSE CATEGORIES (use exactly these strings):
 Restaurant, Business Meal, Client Meeting, Travel, Hotel,
-Transportation, Office Supplies, Entertainment, Training, Other
+Transportation, Office Supplies, Entertainment, Training/Workshop, Other
 """.strip()
 
 EXTRACTION_PROMPT = """
@@ -67,6 +69,6 @@ ALLOWED_EXPENSE_CATEGORIES = [
     "Transportation",
     "Office Supplies",
     "Entertainment",
-    "Training",
+    "Training/Workshop",
     "Other",
 ]

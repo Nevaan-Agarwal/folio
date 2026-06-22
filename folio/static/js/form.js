@@ -132,6 +132,9 @@
     validateAndToggleApprove();
     if (showToast) {
       savedIndicator.classList.add("visible");
+      if (window.showToast) {
+        window.showToast("Draft saved", "info", 2000);
+      }
       window.setTimeout(function () {
         savedIndicator.classList.remove("visible");
       }, 3000);

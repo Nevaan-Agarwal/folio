@@ -36,10 +36,9 @@ class _SQLBackend:
         self._is_postgres = database_url.startswith("postgresql://") or database_url.startswith("postgres://")
         self._sqlite_path = ""
         if self._is_postgres and psycopg is None:
-            # Keep local/dev/test environments working even when postgres driver
-            # is unavailable by gracefully falling back to SQLite.
-            self._is_postgres = False
-            self.database_url = "sqlite:///folio.db"
+            raise RuntimeError(
+                "psycopg is required for PostgreSQL DATABASE_URL but is not installed."
+            )
         if not self._is_postgres:
             self._sqlite_path = _normalize_sqlite_url(self.database_url) or "folio.db"
             Path(self._sqlite_path).parent.mkdir(parents=True, exist_ok=True)
@@ -160,6 +159,28 @@ class _SQLBackend:
             finally:
                 conn.close()
 
+    def delete(self, collection_name: str, doc_id: str) -> None:
+        if self._is_postgres:
+            with psycopg.connect(self.database_url) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "DELETE FROM documents WHERE collection_name = %s AND doc_id = %s",
+                        (collection_name, doc_id),
+                    )
+                conn.commit()
+            return
+        with self._sqlite_lock:
+            conn = self._connect_sqlite()
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "DELETE FROM documents WHERE collection_name = ? AND doc_id = ?",
+                    (collection_name, doc_id),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
 
 @dataclass
 class _DocumentSnapshot:
@@ -191,6 +212,9 @@ class _DocumentReference:
             existing.update(next_payload)
             next_payload = existing
         self._store._backend.upsert(self._collection_name, self.id, next_payload)
+
+    def delete(self) -> None:
+        self._store._backend.delete(self._collection_name, self.id)
 
 
 class _Query:

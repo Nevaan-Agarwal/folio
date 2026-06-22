@@ -123,7 +123,7 @@
       if (!payload.surname || payload.surname.trim().length < 2) {
         errors.surname = "Surname is required (min 2 characters).";
       }
-      if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(payload.email || "")) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email || "")) {
         errors.email = "Please provide a valid email address.";
       }
       const password = payload.password || "";

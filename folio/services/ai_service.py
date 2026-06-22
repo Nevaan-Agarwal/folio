@@ -8,6 +8,7 @@ import os
 import re
 import time
 from datetime import datetime
+from statistics import mean
 from typing import Any
 
 from middleware.auth_middleware import sanitize_ocr_text
@@ -109,6 +110,7 @@ class AiService:
             content = response.choices[0].message.content if response.choices else "{}"
             parsed = self._safe_parse_json(content)
             validated = self._validate_and_normalize(parsed)
+            validated = self._enrich_with_ocr_fallback(validated, sanitized_text)
 
             receipt_repository.update_receipt(
                 receipt_id,
@@ -146,7 +148,6 @@ class AiService:
                         {"role": "user", "content": prompt},
                     ],
                     response_format={"type": "json_object"},
-                    max_tokens=1000,
                     temperature=0.1,
                 )
             except Exception as exc:
@@ -210,6 +211,165 @@ class AiService:
             result["rawDataUsed"] = ""
 
         return result
+
+    def _enrich_with_ocr_fallback(self, payload: dict[str, Any], ocr_text: str) -> dict[str, Any]:
+        lines = [line.strip() for line in (ocr_text or "").splitlines() if line.strip()]
+        text = "\n".join(lines)
+        lowered = text.lower()
+
+        def parse_amount(value: str) -> float | None:
+            cleaned = (value or "").strip().replace(" ", "")
+            if not cleaned:
+                return None
+            cleaned = re.sub(r"[^\d,.\-]", "", cleaned)
+            if cleaned.count(",") > 0 and cleaned.count(".") > 0:
+                cleaned = cleaned.replace(".", "").replace(",", ".")
+            elif cleaned.count(",") > 0 and cleaned.count(".") == 0:
+                cleaned = cleaned.replace(",", ".")
+            try:
+                return float(cleaned)
+            except ValueError:
+                return None
+
+        def extract_labeled_amount(patterns: list[str]) -> float | None:
+            for pattern in patterns:
+                match = re.search(pattern, text, flags=re.IGNORECASE)
+                if not match:
+                    continue
+                amount = parse_amount(match.group(1))
+                if amount is not None and amount >= 0:
+                    return amount
+            return None
+
+        if payload.get("total") is None:
+            payload["total"] = extract_labeled_amount(
+                [
+                    r"(?:total|gesamt(?:betrag)?|summe)\s*[:\-]?\s*([0-9][0-9., ]{1,})",
+                    r"([0-9][0-9., ]{1,})\s*(?:eur|€)\s*(?:total|gesamt(?:betrag)?|summe)",
+                ]
+            )
+        if payload.get("subtotal") is None:
+            payload["subtotal"] = extract_labeled_amount(
+                [
+                    r"(?:subtotal|netto|zwischensumme)\s*[:\-]?\s*([0-9][0-9., ]{1,})",
+                ]
+            )
+        if payload.get("tax") is None:
+            payload["tax"] = extract_labeled_amount(
+                [
+                    r"(?:tax|vat|mwst(?:\.|)|ust)\s*[:\-]?\s*([0-9][0-9., ]{1,})",
+                ]
+            )
+        if payload.get("tip") is None:
+            payload["tip"] = extract_labeled_amount(
+                [
+                    r"(?:tip|trinkgeld)\s*[:\-]?\s*([0-9][0-9., ]{1,})",
+                ]
+            )
+
+        if payload.get("date") is None:
+            iso_match = re.search(r"\b(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})\b", text)
+            de_match = re.search(r"\b(\d{1,2})[./-](\d{1,2})[./-](20\d{2})\b", text)
+            if iso_match:
+                year, month, day = iso_match.groups()
+                payload["date"] = f"{int(year):04d}-{int(month):02d}-{int(day):02d}"
+            elif de_match:
+                day, month, year = de_match.groups()
+                payload["date"] = f"{int(year):04d}-{int(month):02d}-{int(day):02d}"
+            if payload.get("tagDerBewirtung") is None:
+                payload["tagDerBewirtung"] = payload.get("date")
+
+        if payload.get("receiptNumber") is None:
+            match = re.search(
+                r"(?:receipt|invoice|beleg|bon|rechnung|rechnungsnr\.?|belegnr\.?)\s*[:#]?\s*([A-Z0-9\-]{3,})",
+                text,
+                flags=re.IGNORECASE,
+            )
+            if match:
+                payload["receiptNumber"] = match.group(1)
+
+        if payload.get("currency") is None:
+            if "€" in text or " eur" in lowered:
+                payload["currency"] = "EUR"
+            elif "$" in text or " usd" in lowered:
+                payload["currency"] = "USD"
+            elif "£" in text or " gbp" in lowered:
+                payload["currency"] = "GBP"
+
+        if payload.get("merchant") is None and lines:
+            skip_terms = {
+                "total",
+                "summe",
+                "betrag",
+                "receipt",
+                "invoice",
+                "rechnung",
+                "mwst",
+                "tax",
+                "date",
+                "beleg",
+            }
+            for line in lines[:5]:
+                normalized = line.lower()
+                if len(line) < 3 or any(term in normalized for term in skip_terms):
+                    continue
+                if re.search(r"[A-Za-z]", line):
+                    payload["merchant"] = line[:80]
+                    break
+
+        if payload.get("address") is None:
+            for line in lines:
+                if re.search(r"\b(str|strasse|road|rd|street|st|platz|allee)\b", line, flags=re.IGNORECASE):
+                    payload["address"] = line[:120]
+                    break
+
+        if payload.get("ortDerBewirtung") is None:
+            payload["ortDerBewirtung"] = payload.get("address")
+
+        if payload.get("suggestedDescription") is None:
+            merchant = payload.get("merchant")
+            total = payload.get("total")
+            if merchant and total is not None:
+                payload["suggestedDescription"] = f"Business meal at {merchant} ({total:.2f} {payload.get('currency') or 'EUR'})."
+
+        if payload.get("language") not in {"de", "en"}:
+            payload["language"] = "de" if any(token in lowered for token in ("rechnung", "mwst", "betrag")) else "en"
+
+        if payload.get("expenseCategory") in (None, "", "Other"):
+            payload["expenseCategory"] = "Restaurant" if any(
+                token in lowered for token in ("restaurant", "cafe", "bewirtung", "gaststatte")
+            ) else "Other"
+
+        confidence = dict(payload.get("confidence") or {})
+        if payload.get("total") is not None and confidence.get("total", 0) < 0.7:
+            confidence["total"] = 0.78
+        if payload.get("merchant") and confidence.get("merchant", 0) < 0.65:
+            confidence["merchant"] = 0.72
+        if payload.get("date") and confidence.get("date", 0) < 0.65:
+            confidence["date"] = 0.7
+        if confidence.get("overall", 0) < 0.5:
+            confidence["overall"] = round(
+                max(
+                    confidence.get("overall", 0),
+                    mean(
+                        [
+                            float(confidence.get("merchant", 0)),
+                            float(confidence.get("total", 0)),
+                            float(confidence.get("date", 0)),
+                        ]
+                    ),
+                ),
+                2,
+            )
+        payload["confidence"] = {
+            "overall": self._clamp_confidence(confidence.get("overall")),
+            "merchant": self._clamp_confidence(confidence.get("merchant")),
+            "total": self._clamp_confidence(confidence.get("total")),
+            "date": self._clamp_confidence(confidence.get("date")),
+        }
+
+        payload["missingFields"] = [key for key in self.NULLABLE_FIELDS if payload.get(key) is None]
+        return payload
 
     def _is_iso_date(self, value: Any) -> bool:
         if not isinstance(value, str):

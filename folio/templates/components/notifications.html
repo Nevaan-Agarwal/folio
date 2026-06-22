@@ -1,0 +1,120 @@
+<style>
+  .notif-wrap { position: relative; }
+  .notif-bell-btn {
+    position: relative;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid var(--border-default);
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .notif-bell-btn svg { width: 18px; height: 18px; }
+  .notif-badge {
+    position: absolute;
+    top: -5px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--warning);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .notif-badge[hidden] { display: none !important; }
+  .notif-dropdown {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    width: 320px;
+    max-height: 400px;
+    overflow-y: auto;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    z-index: 90;
+  }
+  .notif-dropdown[hidden] { display: none !important; }
+  .notif-header {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-default);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .notif-mark-all {
+    border: 0;
+    background: transparent;
+    color: var(--accent-primary);
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .notif-list { display: grid; }
+  .notif-item {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    display: grid;
+    grid-template-columns: 26px 1fr 10px;
+    gap: 10px;
+    align-items: start;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-default);
+    cursor: pointer;
+  }
+  .notif-item:hover { background: var(--bg-elevated); }
+  .notif-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .notif-icon.receipt { color: var(--warning); background: rgba(245,166,35,.14); }
+  .notif-icon.pdf { color: var(--success); background: rgba(45,212,160,.14); }
+  .notif-icon.error { color: var(--error); background: rgba(255,92,92,.14); }
+  .notif-icon.email { color: #5f9dff; background: rgba(95,157,255,.14); }
+  .notif-icon.form, .notif-icon.review, .notif-icon.info { color: var(--accent-primary); background: var(--accent-muted); }
+  .notif-message { color: var(--text-primary); font-size: 13px; line-height: 1.3; margin: 0; }
+  .notif-time { color: var(--text-muted); font-size: 11px; margin-top: 3px; }
+  .notif-unread-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    margin-top: 6px;
+  }
+  .notif-unread-dot[hidden] { display: none !important; }
+  .notif-empty { padding: 14px; color: var(--text-secondary); font-size: 13px; text-align: center; }
+</style>
+<div class="notif-wrap" id="notificationCenter">
+  <button class="notif-bell-btn" type="button" id="notificationBellBtn" aria-label="Notifications">
+    <svg viewBox="0 0 24 24" fill="none">
+      <path d="M12 3a5 5 0 0 0-5 5v3.6l-1.6 2.8c-.4.7.1 1.6.9 1.6h11.4c.8 0 1.3-.9.9-1.6L17 11.6V8a5 5 0 0 0-5-5Zm0 18a2.4 2.4 0 0 0 2.3-1.8H9.7A2.4 2.4 0 0 0 12 21Z" />
+    </svg>
+    <span class="notif-badge" id="notificationBadge" hidden>0</span>
+  </button>
+  <div class="notif-dropdown" id="notificationDropdown" hidden>
+    <div class="notif-header">
+      <strong style="font-size:13px;">Notifications</strong>
+      <button class="notif-mark-all" id="notificationMarkAllRead" type="button">Mark all read</button>
+    </div>
+    <div class="notif-list" id="notificationList">
+      <p class="notif-empty">No notifications yet.</p>
+    </div>
+  </div>
+</div>
