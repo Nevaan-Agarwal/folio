@@ -13,7 +13,7 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from config import firebase as firebase_config
-from repositories import combined_document_repository
+from repositories import audit_repository, combined_document_repository
 
 
 class EmailService:
@@ -112,6 +112,23 @@ class EmailService:
         except Exception as exc:
             return None, str(exc)
 
+    def _humanize_delivery_error(self, error_message: str | None) -> str:
+        message = (error_message or "").strip()
+        lowered = message.lower()
+        if "testing emails" in lowered or "sandbox" in lowered:
+            return (
+                "Resend sandbox restriction: you can only send to verified addresses. "
+                "Use your own verified recipient or verify a domain/address in Resend."
+            )
+        if "invalid `from`" in lowered or "from address" in lowered:
+            return (
+                "Sender address is not allowed by Resend. "
+                "Set RESEND_FROM_EMAIL to a verified sender/domain."
+            )
+        if "api key" in lowered or "unauthorized" in lowered or "403" in lowered:
+            return "Resend authentication failed. Check RESEND_API_KEY."
+        return message or "Unknown delivery error."
+
     def send_pdf_delivery(
         self,
         to_email: str,
@@ -129,7 +146,7 @@ class EmailService:
         )
 
         firebase_config.db.collection("combined_documents").document(document_id).set(
-            {"emailDeliveryStatus": "pending"},
+            {"emailDeliveryStatus": "pending", "emailError": None},
             merge=True,
         )
         try:
@@ -142,30 +159,47 @@ class EmailService:
                 filename=filename,
             )
             if error:
+                friendly_error = self._humanize_delivery_error(error)
                 firebase_config.db.collection("combined_documents").document(document_id).set(
                     {
                         "emailSent": True,
                         "emailSentAt": datetime.now(timezone.utc).isoformat(),
                         "emailMessageId": None,
                         "emailDeliveryStatus": "failed",
+                        "emailError": friendly_error,
                     },
                     merge=True,
                 )
-                return {"success": False, "message_id": None, "error": error}
+                return {"success": False, "message_id": None, "error": friendly_error}
 
             combined_document_repository.update_email_status(document_id, "sent", message_id)
+            payload = {}
+            if firebase_config.db is not None:
+                document = firebase_config.db.collection("combined_documents").document(document_id).get()
+                payload = document.to_dict() if document.exists else {}
+            audit_repository.create_log(
+                user_id=payload.get("userId", ""),
+                action="email_sent",
+                details={
+                    "documentId": document_id,
+                    "email": to_email,
+                    "messageId": message_id,
+                },
+            )
             return {"success": True, "message_id": message_id, "error": None}
         except Exception as exc:
+            friendly_error = self._humanize_delivery_error(str(exc))
             firebase_config.db.collection("combined_documents").document(document_id).set(
                 {
                     "emailSent": True,
                     "emailSentAt": datetime.now(timezone.utc).isoformat(),
                     "emailMessageId": None,
                     "emailDeliveryStatus": "failed",
+                    "emailError": friendly_error,
                 },
                 merge=True,
             )
-            return {"success": False, "message_id": None, "error": str(exc)}
+            return {"success": False, "message_id": None, "error": friendly_error}
 
     def send_email_with_html(
         self,

@@ -276,7 +276,14 @@ def login():
             return jsonify({"status": "error", "errors": {"auth": message}}), 401
         flash(message, "error")
         return redirect(url_for("auth.login_page"))
-    if not user.passwordHash or not check_password_hash(user.passwordHash, password):
+    if not user.passwordHash:
+        _record_failed_attempt(client_key)
+        message = "This account requires a password reset before sign in."
+        if _wants_json_response():
+            return jsonify({"status": "error", "errors": {"auth": message}}), 403
+        flash(message, "error")
+        return redirect(url_for("auth.login_page"))
+    if not check_password_hash(user.passwordHash, password):
         _record_failed_attempt(client_key)
         message = "Invalid email or password."
         if _wants_json_response():
@@ -329,7 +336,7 @@ def logout():
 @auth_bp.get("/dashboard")
 @require_auth
 def dashboard():
-    return redirect(url_for("receipts.new_receipt"))
+    return redirect(url_for("dashboard.home"))
 
 
 @auth_bp.route("/settings", methods=["GET", "POST"])

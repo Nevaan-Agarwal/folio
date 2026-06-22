@@ -123,6 +123,153 @@
 
   render();
 })();
-function loadArchive() {
-  return [];
-}
+
+(function () {
+  const root = document.getElementById("globalSearchRoot");
+  const input = document.getElementById("globalSearchInput");
+  const icon = document.getElementById("globalSearchIcon");
+  const dropdown = document.getElementById("globalSearchDropdown");
+  if (!root || !input || !icon || !dropdown) return;
+
+  const RECENT_KEY = "folio_recent_searches";
+  let latestQuery = "";
+
+  function loadRecentSearches() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
+      return Array.isArray(parsed) ? parsed.filter(Boolean).slice(0, 5) : [];
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  function saveRecentSearch(term) {
+    const normalized = String(term || "").trim();
+    if (!normalized) return;
+    const current = loadRecentSearches().filter(function (item) {
+      return item.toLowerCase() !== normalized.toLowerCase();
+    });
+    current.unshift(normalized);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(current.slice(0, 5)));
+  }
+
+  function openDropdown(html) {
+    dropdown.innerHTML = html;
+    dropdown.hidden = false;
+  }
+
+  function closeDropdown() {
+    dropdown.hidden = true;
+  }
+
+  function goSearch(query) {
+    const normalized = String(query || "").trim();
+    if (!normalized) return;
+    saveRecentSearch(normalized);
+    window.location.href = "/search?q=" + encodeURIComponent(normalized);
+  }
+
+  function renderRecentSearches() {
+    const recent = loadRecentSearches();
+    if (!recent.length) {
+      openDropdown('<div class="global-search-empty">No recent searches</div>');
+      return;
+    }
+    openDropdown(
+      recent
+        .map(function (term) {
+          return (
+            '<button class="global-search-item" type="button" data-search-term="' +
+            term.replace(/"/g, "&quot;") +
+            '"><strong>' +
+            term.replace(/</g, "&lt;") +
+            '</strong><div class="meta">Recent search</div></button>'
+          );
+        })
+        .join("")
+    );
+    dropdown.querySelectorAll("[data-search-term]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        const term = button.getAttribute("data-search-term") || "";
+        goSearch(term);
+      });
+    });
+  }
+
+  async function fetchAutocomplete(query) {
+    const currentQuery = String(query || "").trim();
+    if (currentQuery.length < 2) {
+      if (!currentQuery) renderRecentSearches();
+      else closeDropdown();
+      return;
+    }
+    latestQuery = currentQuery;
+    try {
+      const response = await fetch(
+        "/api/search?q=" + encodeURIComponent(currentQuery) + "&limit=5",
+        { headers: { Accept: "application/json" } }
+      );
+      if (!response.ok) return;
+      const payload = await response.json();
+      if (latestQuery !== currentQuery) return;
+      const results = payload.results || [];
+      if (!results.length) {
+        openDropdown('<div class="global-search-empty">No quick matches</div>');
+        return;
+      }
+      openDropdown(
+        results
+          .map(function (item) {
+            return (
+              '<button class="global-search-item" type="button" data-link="' +
+              (item.link || "#") +
+              '">' +
+              '<div><strong>' +
+              String(item.merchant || "-").replace(/</g, "&lt;") +
+              '</strong></div>' +
+              '<div class="meta">' +
+              String(item.date || "-").replace(/</g, "&lt;") +
+              " • € " +
+              Number(item.amount || 0).toFixed(2) +
+              "</div>" +
+              "</button>"
+            );
+          })
+          .join("")
+      );
+      dropdown.querySelectorAll("[data-link]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          const link = button.getAttribute("data-link");
+          if (link) window.location.href = link;
+        });
+      });
+    } catch (_error) {}
+  }
+
+  input.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      goSearch(input.value);
+    }
+  });
+
+  input.addEventListener("focus", function () {
+    if (!input.value.trim()) {
+      renderRecentSearches();
+    }
+  });
+
+  input.addEventListener("input", function () {
+    fetchAutocomplete(input.value);
+  });
+
+  icon.addEventListener("click", function () {
+    goSearch(input.value);
+  });
+
+  document.addEventListener("click", function (event) {
+    if (!event.target.closest("#globalSearchRoot")) {
+      closeDropdown();
+    }
+  });
+})();

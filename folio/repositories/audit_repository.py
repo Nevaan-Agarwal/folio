@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
@@ -26,7 +26,21 @@ ALLOWED_ACTIONS = {
     "user_deactivated",
     "admin_export_csv",
     "document_downloaded",
+    "document_deleted",
     "email_resent",
+    "ocr_failed",
+    "manual_review_required",
+    "db_transaction",
+}
+
+NOTIFICATION_ACTIONS = {
+    "ocr_completed",
+    "ai_processed",
+    "pdf_generated",
+    "email_sent",
+    "email_resent",
+    "ocr_failed",
+    "manual_review_required",
 }
 
 
@@ -40,6 +54,7 @@ class AuditLogModel:
     ipAddress: str
     userAgent: str
     sessionId: str
+    readBy: list[str] = field(default_factory=list)
 
 
 def _now_iso() -> str:
@@ -69,6 +84,7 @@ def _to_model(doc_id: str, payload: dict | None) -> AuditLogModel | None:
         ipAddress=str(data.get("ipAddress", "")),
         userAgent=str(data.get("userAgent", "")),
         sessionId=str(data.get("sessionId", "")),
+        readBy=[str(uid) for uid in (data.get("readBy") or []) if str(uid)],
     )
 
 
@@ -132,6 +148,47 @@ def get_all_logs(
         models.append(model)
     models.sort(key=lambda item: item.timestamp or "", reverse=True)
     return models[: max(1, int(limit))]
+
+
+def get_user_notifications(user_id: str, limit: int = 20) -> list[AuditLogModel]:
+    logs = get_user_logs(user_id=user_id, limit=500)
+    notifications = [log for log in logs if log.action in NOTIFICATION_ACTIONS]
+    return notifications[: max(1, int(limit))]
+
+
+def get_unread_notification_count(user_id: str) -> int:
+    notifications = get_user_notifications(user_id=user_id, limit=500)
+    normalized_user = str(user_id or "")
+    return sum(1 for item in notifications if normalized_user not in (item.readBy or []))
+
+
+def mark_notification_read(user_id: str, notification_id: str) -> bool:
+    if firebase_config.db is None:
+        return False
+    doc_ref = firebase_config.db.collection("auditLogs").document(notification_id)
+    snapshot = doc_ref.get()
+    if not snapshot.exists:
+        return False
+    payload = snapshot.to_dict() or {}
+    if str(payload.get("userId", "")) != str(user_id or ""):
+        return False
+    read_by = [str(uid) for uid in (payload.get("readBy") or []) if str(uid)]
+    normalized_user = str(user_id or "")
+    if normalized_user not in read_by:
+        read_by.append(normalized_user)
+        doc_ref.set({"readBy": read_by}, merge=True)
+    return True
+
+
+def mark_all_notifications_read(user_id: str) -> int:
+    notifications = get_user_notifications(user_id=user_id, limit=500)
+    updated = 0
+    for item in notifications:
+        if str(user_id or "") in (item.readBy or []):
+            continue
+        if mark_notification_read(user_id=user_id, notification_id=item.id):
+            updated += 1
+    return updated
 
 
 def log_event(event: dict) -> None:

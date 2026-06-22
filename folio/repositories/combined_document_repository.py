@@ -12,3 +12,7 @@ def update_email_status(doc_id: str, status: str, message_id: str | None) -> Non
 
 def get_document(doc_id: str) -> CombinedDocumentModel | None:
     return document_repository.get_document(doc_id)
+
+
+def delete_document(doc_id: str) -> None:
+    document_repository.delete_document(doc_id)

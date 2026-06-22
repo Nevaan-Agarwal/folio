@@ -3,8 +3,30 @@
 {% block title %}{{ t('receipt.upload') }} - {{ t('app.name') }}{% endblock %}
 {% block page_title %}{{ t('receipt.upload') }}{% endblock %}
 
+{% block head_extra %}
+<style>
+  .scan-tips {
+    margin: 0 0 16px;
+    padding: 14px 16px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-default);
+    background: var(--bg-elevated);
+  }
+  .scan-tips h3 { margin: 0 0 8px; font-size: 14px; color: var(--accent-primary); }
+  .scan-tips ul { margin: 0; padding-left: 18px; color: var(--text-secondary); font-size: 13px; line-height: 1.45; }
+</style>
+{% endblock %}
+
 {% block content %}
 <section class="card upload-page-card">
+  <div class="scan-tips" role="note" aria-label="Scan quality tips">
+    <h3>For best scan quality</h3>
+    <ul>
+      <li>Place receipt on a flat, dark background with strong lighting.</li>
+      <li>Capture the full receipt (all corners visible) with no blur or shadows.</li>
+      <li>Keep text upright and avoid glare for better OCR confidence.</li>
+    </ul>
+  </div>
   <div class="upload-tabs" role="tablist" aria-label="Upload mode">
     <button class="upload-tab upload-tab-active" type="button" data-tab="file">Upload File</button>
     <button class="upload-tab" type="button" data-tab="camera">Use Camera</button>

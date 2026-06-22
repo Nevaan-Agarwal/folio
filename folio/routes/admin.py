@@ -26,7 +26,7 @@ ALLOWED_CATEGORIES = {
     "Transportation",
     "Office Supplies",
     "Entertainment",
-    "Training",
+    "Training/Workshop",
     "Other",
 }
 

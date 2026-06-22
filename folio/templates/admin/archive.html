@@ -48,7 +48,7 @@
     </select>
     <select class="input-field" name="category">
       <option value="">Category</option>
-      {% for cat in ['Restaurant','Business Meal','Client Meeting','Travel','Hotel','Transportation','Office Supplies','Entertainment','Training','Other'] %}
+      {% for cat in ['Restaurant','Business Meal','Client Meeting','Travel','Hotel','Transportation','Office Supplies','Entertainment','Training/Workshop','Other'] %}
       <option value="{{ cat }}" {% if filters.category == cat %}selected{% endif %}>{{ cat }}</option>
       {% endfor %}
     </select>

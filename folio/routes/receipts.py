@@ -3,11 +3,21 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 from threading import Thread
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 from urllib.request import urlopen
 from uuid import uuid4
 
-from flask import Blueprint, current_app, jsonify, redirect, render_template, request, session, url_for
+from flask import (
+    Blueprint,
+    current_app,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
+)
 
 from middleware.auth_middleware import require_auth
 from middleware.rate_limiter import RATE_LIMITS, limiter, user_rate_limit_key
@@ -30,6 +40,7 @@ STEP_BY_STATUS = {
     "ocr_complete": 3,
     "ai_processing": 4,
     "awaiting_review": 5,
+    "pdf_generation": 6,
     "pdf_generated": 6,
     "completed": 6,
 }
@@ -41,6 +52,7 @@ STATUS_MESSAGES = {
         "ocr_complete": "OCR complete. Preparing AI extraction.",
         "ai_processing": "AI processing receipt details.",
         "awaiting_review": "Ready to review extracted fields.",
+        "pdf_generation": "Generating PDF and preparing email delivery.",
         "pdf_generated": "PDF generated.",
         "completed": "Pipeline completed.",
         "error": "Processing failed.",
@@ -51,6 +63,7 @@ STATUS_MESSAGES = {
         "ocr_complete": "OCR abgeschlossen. KI-Analyse wird vorbereitet.",
         "ai_processing": "KI verarbeitet die Belegdaten.",
         "awaiting_review": "Bereit zur Pruefung der extrahierten Felder.",
+        "pdf_generation": "PDF wird erstellt und E-Mail-Zustellung vorbereitet.",
         "pdf_generated": "PDF wurde erstellt.",
         "completed": "Verarbeitung abgeschlossen.",
         "error": "Verarbeitung fehlgeschlagen.",
@@ -58,17 +71,26 @@ STATUS_MESSAGES = {
 }
 
 
-def _log_status_transition(receipt_id: str, user_id: str, status: str, detail: str = "") -> None:
+def _log_status_transition(
+    receipt_id: str,
+    user_id: str,
+    status: str,
+    detail: str = "",
+    extra_details: dict | None = None,
+) -> None:
     action = None
     if status == "ocr_complete":
         action = "ocr_completed"
     elif status == "awaiting_review":
         action = "ai_processed"
     if action:
+        payload_details = {"receiptId": receipt_id, "status": status, "detail": detail}
+        if extra_details:
+            payload_details.update(extra_details)
         audit_repository.create_log(
             user_id=user_id,
             action=action,
-            details={"receiptId": receipt_id, "status": status, "detail": detail},
+            details=payload_details,
         )
 
 
@@ -79,6 +101,20 @@ def _download_image_to_temp(receipt_id: str, image_url: str) -> str:
     with urlopen(image_url, timeout=20) as response:
         temp_path.write_bytes(response.read())
     return str(temp_path)
+
+
+def _resolve_local_image_path(image_url: str) -> Path | None:
+    parsed = urlparse(image_url or "")
+    if parsed.scheme == "file":
+        decoded = unquote(parsed.path or "")
+        if decoded.startswith("/") and len(decoded) > 2 and decoded[2] == ":":
+            decoded = decoded[1:]
+        candidate = Path(decoded)
+        return candidate if candidate.exists() else None
+    if parsed.scheme:
+        return None
+    candidate = Path(image_url or "")
+    return candidate if candidate.exists() else None
 
 
 def process_receipt_pipeline(receipt_id: str, image_url: str, user_id: str):
@@ -101,7 +137,12 @@ def process_receipt_pipeline(receipt_id: str, image_url: str, user_id: str):
         ocr_result = ocr_service.run_ocr(receipt_id=receipt_id, image_path=temp_image_path)
         if ocr_result.get("error"):
             raise RuntimeError(ocr_result["error"])
-        _log_status_transition(receipt_id, user_id, "ocr_complete")
+        _log_status_transition(
+            receipt_id,
+            user_id,
+            "ocr_complete",
+            extra_details={"confidence": ocr_result.get("confidence", 0)},
+        )
 
         receipt_repository.update_processing_status(receipt_id, "ai_processing")
         _log_status_transition(receipt_id, user_id, "ai_processing")
@@ -115,13 +156,34 @@ def process_receipt_pipeline(receipt_id: str, image_url: str, user_id: str):
             raise RuntimeError(ai_result["error"])
 
         receipt_repository.update_processing_status(receipt_id, "awaiting_review")
-        _log_status_transition(receipt_id, user_id, "awaiting_review")
+        missing_fields = list(ai_result.get("missingFields") or [])
+        needs_manual_review = bool(missing_fields)
+        _log_status_transition(
+            receipt_id,
+            user_id,
+            "awaiting_review",
+            extra_details={
+                "missingFields": missing_fields,
+                "needsManualReview": needs_manual_review,
+            },
+        )
+        if needs_manual_review:
+            audit_repository.create_log(
+                user_id=user_id,
+                action="manual_review_required",
+                details={"receiptId": receipt_id, "missingFields": missing_fields},
+            )
     except Exception as exc:
         receipt_repository.update_receipt(
             receipt_id,
             {"processingStatus": "error", "errorMessage": str(exc)},
         )
         _log_status_transition(receipt_id, user_id, "error", detail=str(exc))
+        audit_repository.create_log(
+            user_id=user_id,
+            action="ocr_failed",
+            details={"receiptId": receipt_id, "error": str(exc)},
+        )
     finally:
         try:
             Path(temp_image_path).unlink(missing_ok=True)
@@ -162,6 +224,24 @@ def review_redirect(receipt_id: str):
     return redirect(url_for("forms.review_form_by_receipt", receipt_id=receipt_id))
 
 
+@receipts_bp.get("/<receipt_id>/image")
+@require_auth
+def receipt_image(receipt_id: str):
+    receipt = receipt_repository.get_receipt(receipt_id)
+    if receipt is None:
+        return jsonify({"status": "error", "message": "Receipt not found."}), 404
+
+    user_id = session.get("uid")
+    is_admin = session.get("role") == "admin"
+    if receipt.userId != user_id and not is_admin:
+        return jsonify({"status": "error", "message": "Forbidden"}), 403
+
+    local_path = _resolve_local_image_path(receipt.imageUrl)
+    if local_path is not None:
+        return send_file(local_path)
+    return redirect(receipt.imageUrl)
+
+
 @receipts_bp.get("/<receipt_id>/process")
 @require_auth
 def process_receipt(receipt_id: str):
@@ -173,7 +253,11 @@ def process_receipt(receipt_id: str):
     if receipt.userId != user_id and not is_admin:
         return jsonify({"status": "error", "message": "Forbidden"}), 403
 
-    if receipt.processingStatus in {"ocr_processing", "ai_processing"}:
+    if receipt.processingStatus in {"ocr_processing", "ai_processing", "pdf_generation"}:
+        return jsonify({"status": receipt.processingStatus}), 200
+
+    # Completed/ready states should never restart OCR+AI.
+    if receipt.processingStatus in {"awaiting_review", "pdf_generated", "completed"}:
         return jsonify({"status": receipt.processingStatus}), 200
 
     Thread(
@@ -208,7 +292,7 @@ def receipt_status(receipt_id: str):
         "step": step,
         "message": message,
     }
-    if status == "awaiting_review":
+    if status in {"awaiting_review", "pdf_generated", "completed"}:
         payload["redirectUrl"] = f"/receipts/{receipt_id}/review"
     if status == "error":
         payload["error"] = getattr(receipt, "errorMessage", None) or "Processing failed."

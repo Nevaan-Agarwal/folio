@@ -116,7 +116,8 @@ def test_pdf_download_url_is_valid(monkeypatch):
         response = client.get("/archive/doc-1")
     body = response.get_data(as_text=True)
     assert response.status_code == 200
-    assert 'href="https://example.com/file.pdf"' in body
+    assert 'href="/archive/doc-1/pdf?download=1"' in body
+    assert 'href="/archive/doc-1/pdf"' in body
 
 
 def test_resend_email_works(monkeypatch):
@@ -169,3 +170,84 @@ def test_audit_timeline_shows_correct_events(monkeypatch):
     assert response.status_code == 200
     assert "receipt_uploaded" in body
     assert "form_approved" in body
+
+
+def test_archive_detail_shows_delete_submission_for_owner(monkeypatch):
+    app = create_app("testing")
+    monkeypatch.setattr(archive_routes.combined_document_repository, "get_document", lambda _doc_id: _doc())
+    monkeypatch.setattr(archive_routes.form_repository, "get_form", lambda _fid: _form())
+    monkeypatch.setattr(archive_routes.receipt_repository, "get_receipt", lambda _rid: _receipt())
+    monkeypatch.setattr(
+        archive_routes,
+        "_get_audit_timeline",
+        lambda document_id, form_id, receipt_id, user_id: [],
+    )
+    with app.test_client() as client:
+        _session(client)
+        response = client.get("/archive/doc-1")
+    body = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert "Delete Submission" in body
+
+
+def test_delete_submission_endpoint_removes_related_records(monkeypatch):
+    app = create_app("testing")
+    deleted = {"doc": [], "form": [], "receipt": [], "blob": []}
+    monkeypatch.setattr(
+        documents_routes.combined_document_repository,
+        "get_document",
+        lambda _doc_id: _doc(),
+    )
+    monkeypatch.setattr(
+        documents_routes.combined_document_repository,
+        "delete_document",
+        lambda doc_id: deleted["doc"].append(doc_id),
+    )
+    monkeypatch.setattr(
+        documents_routes.form_repository,
+        "delete_form",
+        lambda form_id: deleted["form"].append(form_id),
+    )
+    monkeypatch.setattr(
+        documents_routes.receipt_repository,
+        "delete_receipt",
+        lambda receipt_id: deleted["receipt"].append(receipt_id),
+    )
+    monkeypatch.setattr(
+        documents_routes.firebase_config,
+        "bucket",
+        type(
+            "Bucket",
+            (),
+            {"blob": lambda self, path: type("Blob", (), {"delete": lambda self: deleted["blob"].append(path)})()},
+        )(),
+    )
+    monkeypatch.setattr(
+        documents_routes.audit_repository,
+        "create_log",
+        lambda **_kwargs: None,
+    )
+
+    with app.test_client() as client:
+        _session(client, uid="user-1", role="employee")
+        response = client.post("/documents/doc-1/delete")
+
+    assert response.status_code == 200
+    assert response.get_json()["success"] is True
+    assert deleted["doc"] == ["doc-1"]
+    assert deleted["form"] == ["form-1"]
+    assert deleted["receipt"] == ["receipt-1"]
+    assert deleted["blob"] == ["combined_documents/user-1/doc-1/file.pdf"]
+
+
+def test_delete_submission_endpoint_forbidden_for_other_user(monkeypatch):
+    app = create_app("testing")
+    monkeypatch.setattr(
+        documents_routes.combined_document_repository,
+        "get_document",
+        lambda _doc_id: _doc(user_id="someone-else"),
+    )
+    with app.test_client() as client:
+        _session(client, uid="user-1", role="employee")
+        response = client.post("/documents/doc-1/delete")
+    assert response.status_code == 403

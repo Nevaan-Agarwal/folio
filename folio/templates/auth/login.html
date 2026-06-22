@@ -113,8 +113,14 @@
         if (!response.ok) {
           if (data.errors) {
             Object.keys(data.errors).forEach(function (field) {
-              setError(field, data.errors[field]);
+              if (field === "auth") {
+                setError("form", data.errors[field]);
+              } else {
+                setError(field, data.errors[field]);
+              }
             });
+          } else if (data.error || data.message) {
+            setError("form", data.error || data.message);
           } else {
             setError("form", "Login failed. Please try again.");
           }

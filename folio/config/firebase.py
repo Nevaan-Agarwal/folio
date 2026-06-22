@@ -40,6 +40,10 @@ class LocalBlob:
     def generate_signed_url(self, expiration=None, method="GET", version="v4"):
         return self.public_url
 
+    def delete(self):
+        if self._absolute_path.exists():
+            self._absolute_path.unlink()
+
 
 class LocalBucket:
     def __init__(self, root: Path):
@@ -63,7 +67,21 @@ def init_firebase(app=None) -> None:
         if storage_root:
             os.environ.setdefault("STORAGE_ROOT", str(storage_root))
 
-    database_url = os.getenv("DATABASE_URL", "sqlite:///folio.db").strip() or "sqlite:///folio.db"
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    is_testing = bool(app is not None and app.config.get("TESTING"))
+    if not database_url:
+        raise RuntimeError(
+            "DATABASE_URL is required. Set it to a PostgreSQL URL "
+            "(postgresql://... or postgres://...)."
+        )
+    if not is_testing and not (
+        database_url.startswith("postgresql://")
+        or database_url.startswith("postgres://")
+    ):
+        raise RuntimeError(
+            "DATABASE_URL must be PostgreSQL in non-testing environments "
+            "(postgresql://... or postgres://...)."
+        )
     storage_root = Path(os.getenv("STORAGE_ROOT", "storage")).resolve()
     db = init_document_store(database_url)
     bucket = LocalBucket(storage_root)

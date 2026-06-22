@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from config import firebase as firebase_config
 from models.receipt import ReceiptModel
+from repositories import audit_repository
 
 
 def _to_receipt_model(receipt_id: str, data: dict | None) -> ReceiptModel | None:
@@ -62,17 +63,81 @@ def create_receipt(user_id: str, image_url: str, receipt_id: str | None = None) 
     }
 
     collection = firebase_config.db.collection("receipts")
-    if receipt_id:
-        collection.document(receipt_id).set(payload)
-        return receipt_id
+    try:
+        if receipt_id:
+            ref = collection.document(receipt_id)
+            ref.set(payload)
+            if not ref.get().exists:
+                raise RuntimeError("Failed to persist receipt document.")
+            audit_repository.create_log(
+                user_id=user_id or "system",
+                action="db_transaction",
+                details={
+                    "status": "success",
+                    "operation": "create",
+                    "collection": "receipts",
+                    "docId": receipt_id,
+                },
+            )
+            return receipt_id
 
-    doc_ref = collection.document()
-    doc_ref.set(payload)
-    return doc_ref.id
+        doc_ref = collection.document()
+        doc_ref.set(payload)
+        if not doc_ref.get().exists:
+            raise RuntimeError("Failed to persist receipt document.")
+        audit_repository.create_log(
+            user_id=user_id or "system",
+            action="db_transaction",
+            details={
+                "status": "success",
+                "operation": "create",
+                "collection": "receipts",
+                "docId": doc_ref.id,
+            },
+        )
+        return doc_ref.id
+    except Exception as exc:
+        audit_repository.create_log(
+            user_id=user_id or "system",
+            action="db_transaction",
+            details={
+                "status": "failed",
+                "operation": "create",
+                "collection": "receipts",
+                "docId": receipt_id or "",
+                "error": str(exc),
+            },
+        )
+        raise
 
 
 def update_receipt(receipt_id: str, data: dict) -> None:
-    firebase_config.db.collection("receipts").document(receipt_id).set(data, merge=True)
+    user_id = str((data or {}).get("userId") or "system")
+    try:
+        firebase_config.db.collection("receipts").document(receipt_id).set(data, merge=True)
+        audit_repository.create_log(
+            user_id=user_id,
+            action="db_transaction",
+            details={
+                "status": "success",
+                "operation": "update",
+                "collection": "receipts",
+                "docId": receipt_id,
+            },
+        )
+    except Exception as exc:
+        audit_repository.create_log(
+            user_id=user_id,
+            action="db_transaction",
+            details={
+                "status": "failed",
+                "operation": "update",
+                "collection": "receipts",
+                "docId": receipt_id,
+                "error": str(exc),
+            },
+        )
+        raise
 
 
 def get_receipt(receipt_id: str) -> ReceiptModel | None:
@@ -117,3 +182,33 @@ def update_review_and_processing_status(
         receipt_id,
         {"reviewStatus": review_status, "processingStatus": processing_status},
     )
+
+
+def delete_receipt(receipt_id: str) -> None:
+    if firebase_config.db is None:
+        return
+    try:
+        firebase_config.db.collection("receipts").document(receipt_id).delete()
+        audit_repository.create_log(
+            user_id="system",
+            action="db_transaction",
+            details={
+                "status": "success",
+                "operation": "delete",
+                "collection": "receipts",
+                "docId": receipt_id,
+            },
+        )
+    except Exception as exc:
+        audit_repository.create_log(
+            user_id="system",
+            action="db_transaction",
+            details={
+                "status": "failed",
+                "operation": "delete",
+                "collection": "receipts",
+                "docId": receipt_id,
+                "error": str(exc),
+            },
+        )
+        raise

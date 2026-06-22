@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import datetime
+from io import BytesIO
 
-from flask import Blueprint, g, jsonify, render_template, request
+from flask import Blueprint, g, jsonify, render_template, request, send_file, url_for
 
 from config import firebase as firebase_config
 from middleware.auth_middleware import require_auth
@@ -20,7 +21,7 @@ ALLOWED_CATEGORIES = {
     "Transportation",
     "Office Supplies",
     "Entertainment",
-    "Training",
+    "Training/Workshop",
     "Other",
 }
 
@@ -62,9 +63,10 @@ def _extract_submission(doc) -> dict:
         or form.get("dateOfHospitality")
         or payload.get("createdAt", "")[:10]
     )
+    document_id = payload.get("id", doc.id)
     return {
         "id": doc.id,
-        "documentId": payload.get("id", doc.id),
+        "documentId": document_id,
         "receiptId": receipt_id or "",
         "formId": form_id or "",
         "merchant": form.get("merchant") or receipt.get("merchant") or "Unknown Merchant",
@@ -73,8 +75,10 @@ def _extract_submission(doc) -> dict:
         "occasion": form.get("occasion") or "",
         "totalAmount": _to_float(form.get("totalAmount") or receipt.get("total")),
         "status": receipt.get("processingStatus", "processing"),
-        "thumbnailUrl": receipt.get("imageUrl", ""),
-        "pdfUrl": payload.get("downloadUrl", ""),
+        "thumbnailUrl": (
+            url_for("receipts.receipt_image", receipt_id=receipt_id) if receipt_id else ""
+        ),
+        "pdfUrl": url_for("archive.archive_document_pdf", document_id=document_id),
         "createdAt": payload.get("createdAt", ""),
         "userId": payload.get("userId", ""),
     }
@@ -258,21 +262,54 @@ def archive_document_detail(document_id: str):
 
     receipt = asdict(receipt_model)
     form = asdict(form_model)
+    form["invoiceAmount"] = _to_float(form.get("invoiceAmount"))
+    form["tip"] = _to_float(form.get("tip"))
+    form["totalAmount"] = _to_float(form.get("totalAmount"))
     timeline = _get_audit_timeline(
         document_id=document.id,
         form_id=document.formId,
         receipt_id=document.receiptId,
         user_id=document.userId,
     )
-    can_delete = (
-        form.get("status") == "draft"
-        or receipt.get("processingStatus") in {"uploaded", "draft"}
-    )
+    can_delete = document.userId == g.user.get("uid") or is_admin
     return render_template(
         "archive/document_detail.html",
         document=document,
+        documentPdfUrl=url_for("archive.archive_document_pdf", document_id=document.id),
         receipt=receipt,
         form=form,
         timeline=timeline,
         can_delete=can_delete,
+    )
+
+
+@archive_bp.get("/<document_id>/pdf")
+@require_auth
+def archive_document_pdf(document_id: str):
+    document = combined_document_repository.get_document(document_id)
+    if document is None:
+        return jsonify({"success": False, "error": "Document not found"}), 404
+
+    is_admin = g.user.get("role") == "admin"
+    if document.userId != g.user.get("uid") and not is_admin:
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+
+    if firebase_config.bucket is None or not document.filePath:
+        return jsonify({"success": False, "error": "PDF file unavailable"}), 404
+
+    try:
+        blob = firebase_config.bucket.blob(document.filePath)
+        pdf_bytes = blob.download_as_bytes()
+    except Exception:
+        return jsonify({"success": False, "error": "PDF file unavailable"}), 404
+
+    filename = f"{document.id}.pdf"
+    if "/" in document.filePath:
+        filename = document.filePath.rsplit("/", 1)[-1] or filename
+    as_attachment = request.args.get("download") in {"1", "true", "yes"}
+    return send_file(
+        BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=as_attachment,
+        download_name=filename,
     )

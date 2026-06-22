@@ -12,6 +12,60 @@
     />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}" />
+    <style>
+      .global-search-wrap { position: relative; }
+      .global-search {
+        width: 16rem;
+        border: 1px solid var(--border-default);
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        border-radius: 999px;
+        padding: 9px 12px 9px 34px;
+        font-size: 13px;
+        transition: width .18s ease, border-color .18s ease;
+      }
+      .global-search:focus {
+        width: 20rem;
+        outline: none;
+        border-color: var(--accent-primary);
+      }
+      .global-search-icon {
+        position: absolute;
+        left: 11px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .global-search-dropdown {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: calc(100% + 8px);
+        background: var(--bg-surface);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-card);
+        z-index: 50;
+        overflow: hidden;
+      }
+      .global-search-dropdown[hidden] { display: none !important; }
+      .global-search-item {
+        width: 100%;
+        text-align: left;
+        border: 0;
+        background: transparent;
+        padding: 9px 11px;
+        cursor: pointer;
+        color: var(--text-primary);
+        border-bottom: 1px solid var(--border-default);
+      }
+      .global-search-item:last-child { border-bottom: 0; }
+      .global-search-item:hover { background: var(--bg-elevated); }
+      .global-search-item .meta { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+      .global-search-empty { padding: 11px; color: var(--text-secondary); font-size: 12px; }
+    </style>
     {% block head_extra %}{% endblock %}
   </head>
   <body>
@@ -30,6 +84,9 @@
               </article>
             {% endfor %}
           </div>
+          <script>
+            window.__folioFlashToasts = {{ messages | tojson }};
+          </script>
         {% endif %}
       {% endwith %}
       {% block auth_content %}{% endblock %}
@@ -103,6 +160,18 @@
       <header class="topbar">
         <h1 class="page-title">{% block page_title %}{{ t('nav.dashboard') }}{% endblock %}</h1>
         <div class="topbar-actions">
+          <div class="global-search-wrap" id="globalSearchRoot">
+            <span class="global-search-icon" id="globalSearchIcon">⌕</span>
+            <input
+              id="globalSearchInput"
+              class="global-search"
+              type="search"
+              placeholder="Search receipts, merchants, categories..."
+              autocomplete="off"
+            />
+            <div class="global-search-dropdown" id="globalSearchDropdown" hidden></div>
+          </div>
+          {% include "components/notifications.html" %}
           <span class="topbar-user">{{ session.get('name', t('app.tagline')) }}</span>
           <div class="language-switcher" role="group" aria-label="Language switcher">
             <button
@@ -137,6 +206,9 @@
                 </article>
               {% endfor %}
             </div>
+            <script>
+              window.__folioFlashToasts = {{ messages | tojson }};
+            </script>
           {% endif %}
         {% endwith %}
         {% block content %}
@@ -180,7 +252,21 @@
         });
       })();
     </script>
+    <script src="{{ url_for('static', filename='js/notifications.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/archive.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+      (function () {
+        const flashes = window.__folioFlashToasts || [];
+        if (!Array.isArray(flashes) || !window.showToast) return;
+        flashes.forEach(function (entry) {
+          const category = entry[0];
+          const message = entry[1];
+          const type = category === "error" ? "error" : category === "warning" ? "warning" : "success";
+          window.showToast(message, type);
+        });
+      })();
+    </script>
     {% block scripts %}{% endblock %}
   </body>
 </html>

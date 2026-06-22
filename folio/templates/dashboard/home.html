@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - {{ t('app.name') }}{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block head_extra %}
+<style>
+  .dash-greeting h2 { margin: 0; font-size: 30px; }
+  .dash-greeting p { margin: 4px 0 18px; color: var(--text-secondary); }
+  .dash-banner {
+    background: var(--accent-muted);
+    border: 1px solid var(--accent-primary);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .dash-banner-left { display: flex; align-items: center; gap: 10px; }
+  .dash-banner .warn-icon { color: var(--warning); font-weight: 700; font-size: 18px; }
+  .dash-banner .dismiss-btn {
+    border: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+  }
+  .quick-scan {
+    background: linear-gradient(145deg, var(--bg-surface), #1E3060);
+    border: 1px solid var(--accent-primary);
+    border-radius: var(--radius-xl);
+    padding: 32px 20px;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  .quick-scan svg {
+    width: 48px;
+    height: 48px;
+    color: var(--warning);
+    margin-bottom: 10px;
+  }
+  .quick-scan h3 { margin: 0; font-size: 30px; color: var(--text-primary); }
+  .quick-scan p { margin: 8px 0 18px; color: var(--text-secondary); }
+  .quick-scan .btn-primary { padding: 0 32px; height: 48px; }
+
+  .dash-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .dash-stat {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    padding: 14px;
+  }
+  .dash-stat p { margin: 0; color: var(--text-secondary); font-size: 12px; }
+  .dash-stat strong { display: block; margin-top: 6px; font-size: 28px; color: var(--warning); }
+  .dash-stat.pending strong.safe { color: var(--success); }
+  .dash-stat.pending strong.warn { color: var(--error); }
+
+  .dash-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 10px;
+  }
+  .dash-section-head h3 { margin: 0; }
+  .dash-section-head a { color: var(--accent-primary); text-decoration: none; }
+
+  .recent-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-xl);
+    padding: 8px 14px;
+  }
+  .recent-row {
+    display: grid;
+    grid-template-columns: 48px 1fr auto auto auto;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-default);
+  }
+  .recent-row:last-child { border-bottom: 0; }
+  .recent-row img {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--border-default);
+    background: var(--bg-primary);
+  }
+  .recent-meta p { margin: 0; }
+  .recent-meta .merchant { color: var(--text-primary); font-weight: 600; }
+  .recent-meta .date { color: var(--text-muted); font-size: 12px; }
+  .cat-badge {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border-default);
+    color: var(--text-secondary);
+  }
+  .recent-amount { color: var(--warning); font-weight: 700; }
+  .status-badge {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border-default);
+    color: var(--text-secondary);
+  }
+  .status-badge.ok { color: var(--success); border-color: rgba(45,212,160,.35); background: var(--success-muted); }
+  .status-badge.warn { color: var(--warning); border-color: rgba(245,166,35,.35); background: var(--accent-muted); }
+  .status-badge.err { color: var(--error); border-color: rgba(255,92,92,.35); background: var(--error-muted); }
+  .recent-view { color: var(--accent-primary); text-decoration: none; font-size: 13px; }
+  .recent-empty {
+    color: var(--text-secondary);
+    padding: 18px 0;
+    text-align: center;
+  }
+  .admin-overview {
+    margin-top: 20px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-xl);
+    padding: 14px;
+  }
+  .admin-overview-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .admin-overview-grid .item {
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: 10px;
+    background: var(--bg-primary);
+  }
+  .admin-overview-grid p { margin: 0; color: var(--text-secondary); font-size: 12px; }
+  .admin-overview-grid strong { display: block; margin-top: 4px; color: var(--warning); font-size: 24px; }
+
+  @media (max-width: 1024px) {
+    .dash-stats, .admin-overview-grid { grid-template-columns: 1fr; }
+    .recent-row { grid-template-columns: 40px 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="dash-greeting">
+  <h2>{{ greeting }}</h2>
+  <p>Manage your hospitality expense reports</p>
+</section>
+
+{% if pendingReviewCount > 0 %}
+<section class="dash-banner" id="pendingReviewBanner">
+  <div class="dash-banner-left">
+    <span class="warn-icon">!</span>
+    <span>You have {{ pendingReviewCount }} form(s) awaiting review</span>
+  </div>
+  <div style="display:flex; align-items:center; gap:10px;">
+    <a class="btn-primary" href="{{ actionRequiredForms[0].link if actionRequiredForms else url_for('archive.employee_archive') }}">Review Now →</a>
+    <button class="dismiss-btn" id="dismissPendingBanner" type="button">×</button>
+  </div>
+</section>
+{% endif %}
+
+<section class="quick-scan">
+  <svg viewBox="0 0 24 24" fill="none">
+    <path d="M7 3h10v2h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h3V3Zm2 2h6V5H9v2Zm10 2H5v12h14V7Zm-3 3v2H8v-2h8Z"/>
+  </svg>
+  <h3>Scan a Receipt</h3>
+  <p>Upload or capture your receipt to get started</p>
+  <a class="btn-primary" href="{{ url_for('receipts.new_receipt') }}">Start Scanning →</a>
+</section>
+
+<section class="dash-stats">
+  <article class="dash-stat">
+    <p>Submissions this month</p>
+    <strong>{{ completedThisMonth }}</strong>
+  </article>
+  <article class="dash-stat">
+    <p>Total spent this month</p>
+    <strong>€ {{ "%.2f"|format(totalSpentThisMonth) }}</strong>
+  </article>
+  <article class="dash-stat pending">
+    <p>Pending review</p>
+    <strong class="{{ 'warn' if pendingReviewCount > 0 else 'safe' }}">{{ pendingReviewCount }}</strong>
+  </article>
+</section>
+
+<section>
+  <div class="dash-section-head">
+    <h3>Recent Submissions</h3>
+    <a href="{{ url_for('archive.employee_archive') }}">View All →</a>
+  </div>
+  <div class="recent-card">
+    {% if recentSubmissions %}
+      {% for item in recentSubmissions %}
+      <div class="recent-row">
+        <img src="{{ item.thumbUrl }}" alt="receipt" />
+        <div class="recent-meta">
+          <p class="merchant">{{ item.merchant }}</p>
+          <p class="date">{{ item.date or '-' }}</p>
+        </div>
+        <span class="cat-badge">{{ item.category }}</span>
+        <span class="recent-amount">€ {{ "%.2f"|format(item.amount or 0) }}</span>
+        {% set st = item.status|lower %}
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="status-badge {% if st in ['completed', 'pdf_generated'] %}ok{% elif st == 'error' %}err{% else %}warn{% endif %}">
+            {{ item.status }}
+          </span>
+          <a class="recent-view" href="{{ item.viewUrl }}">View →</a>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="recent-empty">No submissions yet — scan your first receipt!</p>
+    {% endif %}
+  </div>
+</section>
+
+{% if isAdmin %}
+<section class="admin-overview">
+  <div class="dash-section-head" style="margin-bottom:0;">
+    <h3>Company Overview</h3>
+    <a href="{{ url_for('admin.admin_analytics') }}">View Analytics →</a>
+  </div>
+  <div class="admin-overview-grid">
+    <div class="item">
+      <p>All users total</p>
+      <strong>{{ adminOverview.allUsersTotal }}</strong>
+    </div>
+    <div class="item">
+      <p>Company spend this month</p>
+      <strong>€ {{ "%.2f"|format(adminOverview.companySpendThisMonth) }}</strong>
+    </div>
+    <div class="item">
+      <p>Pending reviews across company</p>
+      <strong>{{ adminOverview.pendingReviewsCompany }}</strong>
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const dismiss = document.getElementById("dismissPendingBanner");
+    const banner = document.getElementById("pendingReviewBanner");
+    if (dismiss && banner) {
+      dismiss.addEventListener("click", function () {
+        banner.style.display = "none";
+      });
+    }
+  })();
+</script>
+{% endblock %}

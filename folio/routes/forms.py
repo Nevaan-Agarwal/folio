@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import logging
 from dataclasses import asdict
 from datetime import datetime, timezone
 
@@ -16,6 +17,7 @@ from repositories import (
 )
 from services import pdf_service
 forms_bp = Blueprint("forms", __name__)
+logger = logging.getLogger(__name__)
 
 REQUIRED_FORM_FIELDS = {
     "dateOfHospitality",
@@ -91,6 +93,7 @@ def _form_to_template_payload(form, document=None):
                 completed += 1
         elif value not in (None, "", []):
             completed += 1
+    document_id = document.id if document else f"{form.id}-{form.receiptId}"
     return {
         "id": form.id,
         "receiptId": form.receiptId,
@@ -115,13 +118,26 @@ def _form_to_template_payload(form, document=None):
         "needsManualReview": form.needsManualReview,
         "status": form.status,
         "isReadOnly": form.status == "approved",
-        "documentId": document.id if document else "",
+        "documentId": document_id,
+        "documentPdfUrl": url_for("archive.archive_document_pdf", document_id=document_id),
         "emailDeliveryStatus": (document.emailDeliveryStatus if document else "pending"),
+        "emailError": (document.emailError if document else ""),
         "emailSent": bool(document.emailSent) if document else False,
         "documentEmail": document.userEmail if document else "",
         "completedCount": completed,
         "attentionCount": len(missing_fields),
     }
+
+
+def _generate_pdf_safe(form_id: str, receipt_id: str, user_id: str) -> None:
+    try:
+        pdf_service.generate_pdf(form_id, receipt_id, user_id)
+    except Exception as exc:
+        logger.exception("PDF generation failed for form %s receipt %s", form_id, receipt_id)
+        receipt_repository.update_receipt(
+            receipt_id,
+            {"processingStatus": "error", "errorMessage": f"PDF generation failed: {exc}"},
+        )
 
 
 @forms_bp.get("/receipt/<receipt_id>/review")
@@ -228,7 +244,7 @@ def approve_form(form_id: str):
         request=request,
     )
     worker = threading.Thread(
-        target=pdf_service.generate_pdf,
+        target=_generate_pdf_safe,
         args=(form_id, form.receiptId, g.user.get("uid")),
         daemon=True,
     )

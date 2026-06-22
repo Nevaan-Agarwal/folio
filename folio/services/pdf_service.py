@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import os
+import shutil
 import threading
 import urllib.request
 from datetime import datetime, timezone
 from io import BytesIO
+from pathlib import Path
 from tempfile import NamedTemporaryFile
+from urllib.parse import unquote, urlparse
 
 from config import firebase as firebase_config
+from repositories import audit_repository
 from services import email_service
 
 try:
@@ -38,12 +42,13 @@ except ModuleNotFoundError:  # pragma: no cover - tested via importorskip in PDF
 
 
 class PdfService:
-    NAVY = HexColor("#0F1929") if REPORTLAB_AVAILABLE else None
-    SURFACE = HexColor("#1A2744") if REPORTLAB_AVAILABLE else None
-    AMBER = HexColor("#F5A623") if REPORTLAB_AVAILABLE else None
+    NAVY = HexColor("#0D1240") if REPORTLAB_AVAILABLE else None
+    SURFACE = HexColor("#124F94") if REPORTLAB_AVAILABLE else None
+    AMBER = HexColor("#E07E00") if REPORTLAB_AVAILABLE else None
     TEXT_PRIMARY = HexColor("#F0EDE8") if REPORTLAB_AVAILABLE else None
     TEXT_SECONDARY = HexColor("#8A97B0") if REPORTLAB_AVAILABLE else None
-    BORDER = HexColor("#2A3F6B") if REPORTLAB_AVAILABLE else None
+    BORDER = HexColor("#002A69") if REPORTLAB_AVAILABLE else None
+    ERROR = HexColor("#DD3D00") if REPORTLAB_AVAILABLE else None
     WHITE = HexColor("#FFFFFF") if REPORTLAB_AVAILABLE else None
     LIGHT_GRAY = HexColor("#F5F5F5") if REPORTLAB_AVAILABLE else None
 
@@ -98,6 +103,34 @@ class PdfService:
             )
         )
 
+    def _resolve_company_logo_path(self) -> str | None:
+        configured = os.getenv("COMPANY_LOGO_PATH", "").strip()
+        candidates: list[Path] = []
+        if configured:
+            candidates.append(Path(configured))
+        candidates.append(
+            Path(__file__).resolve().parent.parent / "static" / "images" / "company_logo.png"
+        )
+        for candidate in candidates:
+            try:
+                if candidate.exists():
+                    return str(candidate)
+            except OSError:
+                continue
+        return None
+
+    def _build_brand_cell(self):
+        logo_path = self._resolve_company_logo_path()
+        if logo_path:
+            try:
+                logo = Image(logo_path)
+                logo.hAlign = "LEFT"
+                logo._restrictSize(72 * mm, 18 * mm)
+                return logo
+            except Exception:
+                pass
+        return Paragraph("<b><font color='#E07E00'>Folio</font></b>", self.styles["Title"])
+
     def _fetch_form_data(self, form_id: str) -> dict:
         doc = firebase_config.db.collection("forms").document(form_id).get()
         if not doc.exists:
@@ -121,6 +154,19 @@ class PdfService:
         return doc.to_dict() or {}
 
     def _download_receipt_image(self, image_url: str) -> str:
+        parsed = urlparse(image_url or "")
+        if parsed.scheme == "file":
+            decoded = unquote(parsed.path or "")
+            if decoded.startswith("/") and len(decoded) > 2 and decoded[2] == ":":
+                decoded = decoded[1:]
+            source_path = decoded
+            if not os.path.exists(source_path):
+                raise ValueError("Receipt image file not found.")
+            with NamedTemporaryFile(delete=False, suffix=os.path.splitext(source_path)[1] or ".jpg") as temp:
+                with open(source_path, "rb") as src:
+                    shutil.copyfileobj(src, temp)
+                return temp.name
+
         with NamedTemporaryFile(delete=False, suffix=".jpg") as temp:
             with urllib.request.urlopen(image_url, timeout=10) as response:
                 temp.write(response.read())
@@ -135,20 +181,19 @@ class PdfService:
         document_ref = (
             f"FOL-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{str(form_data.get('id', 'NA'))[:6].upper()}"
         )
-        employee = f"{user_data.get('firstName', '')} {user_data.get('surname', '')}".strip() or "Unknown"
 
         header_table = Table(
             [
                 [
-                    Paragraph("<b><font color='#F5A623'>Folio</font></b>", self.styles["Title"]),
+                    self._build_brand_cell(),
                     Paragraph(
                         "<para align='right'><font color='#FFFFFF'>Bewirtungsbeleg / Hospitality Expense Form</font></para>",
                         self.styles["BodyText"],
                     ),
                 ]
             ],
-            colWidths=[95 * mm, 85 * mm],
-            rowHeights=[20 * mm],
+            colWidths=[100 * mm, 80 * mm],
+            rowHeights=[22 * mm],
         )
         header_table.setStyle(
             TableStyle(
@@ -168,7 +213,6 @@ class PdfService:
             [
                 ["Document #", document_ref],
                 ["Generated", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")],
-                ["Employee", employee],
             ],
             colWidths=[30 * mm, 60 * mm],
             hAlign="RIGHT",
@@ -255,10 +299,10 @@ class PdfService:
             )
         )
         story.append(fin_table)
-        story.append(Spacer(1, 12))
+        story.append(Spacer(1, 24))
         story.append(
             Paragraph(
-                "Employee Signature: _________________________   Date: _____________",
+                "Signature: _________________________   Date: _____________",
                 self.styles["BodyText"],
             )
         )
@@ -282,10 +326,18 @@ class PdfService:
         story.append(HRFlowable(width="100%", color=self.AMBER, thickness=1.2))
         story.append(Spacer(1, 10))
 
-        receipt_img = Image(receipt_image_path)
-        receipt_img.hAlign = "CENTER"
-        receipt_img._restrictSize(150 * mm, 220 * mm)
-        story.append(receipt_img)
+        try:
+            receipt_img = Image(receipt_image_path)
+            receipt_img.hAlign = "CENTER"
+            receipt_img._restrictSize(150 * mm, 220 * mm)
+            story.append(receipt_img)
+        except Exception:
+            story.append(
+                Paragraph(
+                    "<para align='center'>Receipt image preview unavailable for this document.</para>",
+                    self.styles["FolioMuted"],
+                )
+            )
         story.append(Spacer(1, 8))
         story.append(
             Paragraph(
@@ -296,7 +348,31 @@ class PdfService:
         story.append(Paragraph(f"<para align='center'>Reference: {document_ref}</para>", self.styles["FolioMuted"]))
         return story
 
-    def _build_pdf_bytes(self, form_data: dict, user_data: dict, receipt_image_path: str) -> bytes:
+    def _normalize_form_data_for_pdf(self, form_data: dict, receipt_data: dict) -> dict:
+        normalized = dict(form_data or {})
+        if normalized.get("merchant") in (None, ""):
+            normalized["merchant"] = receipt_data.get("merchant") or "-"
+        if normalized.get("receiptNumber") in (None, ""):
+            normalized["receiptNumber"] = receipt_data.get("receiptNumber") or "-"
+        if normalized.get("date") in (None, ""):
+            normalized["date"] = receipt_data.get("date") or normalized.get("dateOfHospitality") or "-"
+        if normalized.get("place") in (None, ""):
+            normalized["place"] = receipt_data.get("address") or normalized.get("locationOfHospitality") or "-"
+        if normalized.get("invoiceAmount") in (None, ""):
+            normalized["invoiceAmount"] = receipt_data.get("subtotal") or 0
+        if normalized.get("tip") in (None, ""):
+            normalized["tip"] = receipt_data.get("tip") or 0
+        if normalized.get("totalAmount") in (None, ""):
+            normalized["totalAmount"] = receipt_data.get("total") or 0
+        return normalized
+
+    def _build_pdf_bytes(
+        self,
+        form_data: dict,
+        receipt_data: dict,
+        user_data: dict,
+        receipt_image_path: str,
+    ) -> bytes:
         if not REPORTLAB_AVAILABLE:
             plain = (
                 f"Folio\nDocument: {form_data.get('id')}\nType: {form_data.get('type')}\n"
@@ -358,6 +434,7 @@ class PdfService:
             "emailSentAt": None,
             "emailMessageId": None,
             "emailDeliveryStatus": "pending",
+            "emailError": None,
             "userEmail": user_email or "",
             "merchant": form_data.get("merchant") or receipt_data.get("merchant") or "",
             "category": form_data.get("expenseCategory") or "Other",
@@ -368,7 +445,35 @@ class PdfService:
             "status": receipt_data.get("processingStatus") or "pdf_generated",
             "createdAt": datetime.now(timezone.utc).isoformat(),
         }
-        firebase_config.db.collection("combined_documents").document(document_id).set(payload)
+        try:
+            doc_ref = firebase_config.db.collection("combined_documents").document(document_id)
+            doc_ref.set(payload)
+            saved = doc_ref.get()
+            if not saved.exists:
+                raise RuntimeError("Combined document was not persisted.")
+            audit_repository.create_log(
+                user_id=user_id,
+                action="db_transaction",
+                details={
+                    "status": "success",
+                    "operation": "upsert",
+                    "collection": "combined_documents",
+                    "docId": document_id,
+                },
+            )
+        except Exception as exc:
+            audit_repository.create_log(
+                user_id=user_id,
+                action="db_transaction",
+                details={
+                    "status": "failed",
+                    "operation": "upsert",
+                    "collection": "combined_documents",
+                    "docId": document_id,
+                    "error": str(exc),
+                },
+            )
+            raise
 
     def _send_document_email(
         self,
@@ -394,11 +499,12 @@ class PdfService:
         form_data = self._fetch_form_data(form_id)
         receipt_data = self._fetch_receipt_data(receipt_id)
         user_data = self._fetch_user_data(user_id)
+        form_data = self._normalize_form_data_for_pdf(form_data, receipt_data)
 
         receipt_image_path = self._download_receipt_image(receipt_data.get("imageUrl", ""))
         document_id = f"{form_id}-{receipt_id}"
         try:
-            pdf_bytes = self._build_pdf_bytes(form_data, user_data, receipt_image_path)
+            pdf_bytes = self._build_pdf_bytes(form_data, receipt_data, user_data, receipt_image_path)
             storage_path, download_url = self._upload_pdf(user_id, document_id, pdf_bytes)
             self._save_combined_document(
                 document_id,
@@ -411,9 +517,46 @@ class PdfService:
                 form_data,
                 receipt_data,
             )
-            firebase_config.db.collection("receipts").document(receipt_id).set(
-                {"processingStatus": "pdf_generated", "pdfUrl": download_url},
-                merge=True,
+            receipt_ref = firebase_config.db.collection("receipts").document(receipt_id)
+            try:
+                receipt_ref.set(
+                    {"processingStatus": "pdf_generated", "pdfUrl": download_url},
+                    merge=True,
+                )
+                updated_receipt = receipt_ref.get()
+                if not updated_receipt.exists:
+                    raise RuntimeError("Receipt update failed while marking PDF generated.")
+                audit_repository.create_log(
+                    user_id=user_id,
+                    action="db_transaction",
+                    details={
+                        "status": "success",
+                        "operation": "update",
+                        "collection": "receipts",
+                        "docId": receipt_id,
+                    },
+                )
+            except Exception as exc:
+                audit_repository.create_log(
+                    user_id=user_id,
+                    action="db_transaction",
+                    details={
+                        "status": "failed",
+                        "operation": "update",
+                        "collection": "receipts",
+                        "docId": receipt_id,
+                        "error": str(exc),
+                    },
+                )
+                raise
+            audit_repository.create_log(
+                user_id=user_id,
+                action="pdf_generated",
+                details={
+                    "receiptId": receipt_id,
+                    "formId": form_id,
+                    "documentId": document_id,
+                },
             )
             threading.Thread(
                 target=self._send_document_email,

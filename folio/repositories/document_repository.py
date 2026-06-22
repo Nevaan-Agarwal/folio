@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from config import firebase as firebase_config
 from models.document import CombinedDocumentModel
+from repositories import audit_repository
 
 
 def _parse_datetime(value):
@@ -32,6 +33,7 @@ def _to_combined_document(doc_id: str, data: dict | None) -> CombinedDocumentMod
         emailSentAt=data.get("emailSentAt"),
         emailMessageId=data.get("emailMessageId"),
         emailDeliveryStatus=data.get("emailDeliveryStatus", "pending"),
+        emailError=data.get("emailError"),
         userEmail=data.get("userEmail", ""),
     )
 
@@ -53,12 +55,92 @@ def update_email_status(doc_id: str, status: str, message_id: str | None) -> Non
         "emailMessageId": message_id,
         "emailSent": True,
         "emailSentAt": datetime.now(timezone.utc).isoformat(),
+        "emailError": None,
     }
-    firebase_config.db.collection("combined_documents").document(doc_id).set(payload, merge=True)
+    try:
+        firebase_config.db.collection("combined_documents").document(doc_id).set(payload, merge=True)
+        audit_repository.create_log(
+            user_id="system",
+            action="db_transaction",
+            details={
+                "status": "success",
+                "operation": "update",
+                "collection": "combined_documents",
+                "docId": doc_id,
+            },
+        )
+    except Exception as exc:
+        audit_repository.create_log(
+            user_id="system",
+            action="db_transaction",
+            details={
+                "status": "failed",
+                "operation": "update",
+                "collection": "combined_documents",
+                "docId": doc_id,
+                "error": str(exc),
+            },
+        )
+        raise
 
 
 def save_document(document_data: dict) -> str:
     """Backward-compatible helper for legacy callers."""
-    ref = firebase_config.db.collection("combined_documents").document()
-    ref.set(document_data)
-    return ref.id
+    user_id = str((document_data or {}).get("userId") or "system")
+    try:
+        ref = firebase_config.db.collection("combined_documents").document()
+        ref.set(document_data)
+        audit_repository.create_log(
+            user_id=user_id,
+            action="db_transaction",
+            details={
+                "status": "success",
+                "operation": "create",
+                "collection": "combined_documents",
+                "docId": ref.id,
+            },
+        )
+        return ref.id
+    except Exception as exc:
+        audit_repository.create_log(
+            user_id=user_id,
+            action="db_transaction",
+            details={
+                "status": "failed",
+                "operation": "create",
+                "collection": "combined_documents",
+                "docId": "",
+                "error": str(exc),
+            },
+        )
+        raise
+
+
+def delete_document(doc_id: str) -> None:
+    if firebase_config.db is None:
+        return
+    try:
+        firebase_config.db.collection("combined_documents").document(doc_id).delete()
+        audit_repository.create_log(
+            user_id="system",
+            action="db_transaction",
+            details={
+                "status": "success",
+                "operation": "delete",
+                "collection": "combined_documents",
+                "docId": doc_id,
+            },
+        )
+    except Exception as exc:
+        audit_repository.create_log(
+            user_id="system",
+            action="db_transaction",
+            details={
+                "status": "failed",
+                "operation": "delete",
+                "collection": "combined_documents",
+                "docId": doc_id,
+                "error": str(exc),
+            },
+        )
+        raise

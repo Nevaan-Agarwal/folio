@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import time
 
 from app import create_app
+from models.document import CombinedDocumentModel
 from models.form import FormModel
 from models.receipt import ReceiptModel
 from routes import forms as forms_routes
@@ -37,26 +38,28 @@ def _sample_form(**overrides):
     return FormModel(**payload)
 
 
-def _sample_receipt():
-    return ReceiptModel(
-        id="receipt-1",
-        userId="user-1",
-        imageUrl="https://example.com/receipt.jpg",
-        uploadedAt=datetime.now(timezone.utc),
-        ocrText="OCR TEXT",
-        ocrConfidence=84.0,
-        merchant="Hotel Berlin",
-        address="Berlin",
-        date="2026-06-17",
-        currency="EUR",
-        subtotal=100.0,
-        tax=19.0,
-        tip=10.0,
-        total=110.0,
-        receiptNumber="RB-1",
-        processingStatus="awaiting_review",
-        reviewStatus="draft",
-    )
+def _sample_receipt(**overrides):
+    payload = {
+        "id": "receipt-1",
+        "userId": "user-1",
+        "imageUrl": "https://example.com/receipt.jpg",
+        "uploadedAt": datetime.now(timezone.utc),
+        "ocrText": "OCR TEXT",
+        "ocrConfidence": 84.0,
+        "merchant": "Hotel Berlin",
+        "address": "Berlin",
+        "date": "2026-06-17",
+        "currency": "EUR",
+        "subtotal": 100.0,
+        "tax": 19.0,
+        "tip": 10.0,
+        "total": 110.0,
+        "receiptNumber": "RB-1",
+        "processingStatus": "awaiting_review",
+        "reviewStatus": "draft",
+    }
+    payload.update(overrides)
+    return ReceiptModel(**payload)
 
 
 def _auth_session(client):
@@ -263,3 +266,40 @@ def test_approved_form_is_read_only(monkeypatch):
     assert response.status_code == 200
     assert 'data-read-only="true"' in body
     assert "Download PDF" not in body
+
+
+def test_review_download_button_points_to_document_pdf(monkeypatch):
+    app = create_app("testing")
+    monkeypatch.setattr(
+        forms_routes.form_repository,
+        "get_form_by_receipt",
+        lambda _rid: _sample_form(status="approved"),
+    )
+    monkeypatch.setattr(
+        forms_routes.receipt_repository,
+        "get_receipt",
+        lambda _rid: _sample_receipt(processingStatus="pdf_generated"),
+    )
+    monkeypatch.setattr(
+        forms_routes.combined_document_repository,
+        "get_document",
+        lambda _doc_id: CombinedDocumentModel(
+            id="form-1-receipt-1",
+            formId="form-1",
+            receiptId="receipt-1",
+            userId="user-1",
+            filePath="combined_documents/user-1/form-1-receipt-1/folio.pdf",
+            downloadUrl="",
+            createdAt=datetime.now(timezone.utc),
+            emailSent=False,
+            userEmail="alice@example.com",
+        ),
+    )
+
+    with app.test_client() as client:
+        _auth_session(client)
+        response = client.get("/forms/receipt/receipt-1/review")
+
+    body = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert 'href="/archive/form-1-receipt-1/pdf?download=1"' in body
