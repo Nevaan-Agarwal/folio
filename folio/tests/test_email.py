@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from app import create_app
-from config import firebase as firebase_config
+from config import database as database_config
 from models.document import CombinedDocumentModel
 from models.form import FormModel
 from routes import documents as documents_routes
@@ -82,7 +82,7 @@ def _form_data(language="en"):
 
 def test_email_sends_with_pdf_attachment(monkeypatch):
     fake_db = _FakeDB()
-    monkeypatch.setattr(firebase_config, "db", fake_db)
+    monkeypatch.setattr(database_config, "db", fake_db)
     service = EmailService()
     calls = {}
 
@@ -120,9 +120,9 @@ def test_german_user_receives_german_subject():
     )
 
 
-def test_delivery_status_saved_to_firestore(monkeypatch):
+def test_delivery_status_saved_to_database(monkeypatch):
     fake_db = _FakeDB()
-    monkeypatch.setattr(firebase_config, "db", fake_db)
+    monkeypatch.setattr(database_config, "db", fake_db)
     service = EmailService()
     monkeypatch.setattr(service, "_send_via_resend", lambda **_kwargs: ("msg-2", None))
     result = service.send_pdf_delivery(
@@ -142,8 +142,8 @@ def test_delivery_status_saved_to_firestore(monkeypatch):
 
 def test_resend_works_after_initial_failure(monkeypatch):
     app = create_app("testing")
-    monkeypatch.setattr(firebase_config, "bucket", _FakeBucket())
-    monkeypatch.setattr(firebase_config, "db", _FakeDB())
+    monkeypatch.setattr(database_config, "bucket", _FakeBucket())
+    monkeypatch.setattr(database_config, "db", _FakeDB())
 
     document = CombinedDocumentModel(
         id="doc-3",
@@ -207,7 +207,7 @@ def test_resend_works_after_initial_failure(monkeypatch):
 
 def test_pdf_attachment_is_correct_file(monkeypatch):
     fake_db = _FakeDB()
-    monkeypatch.setattr(firebase_config, "db", fake_db)
+    monkeypatch.setattr(database_config, "db", fake_db)
     service = EmailService()
     calls = {}
 

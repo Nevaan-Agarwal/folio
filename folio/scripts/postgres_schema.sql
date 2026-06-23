@@ -18,44 +18,46 @@ CREATE TABLE IF NOT EXISTS receipts (
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     image_url TEXT NOT NULL,
     uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    ocr_text TEXT NOT NULL DEFAULT '',
+    ocr_text TEXT DEFAULT '',
     ocr_confidence DOUBLE PRECISION,
-    merchant TEXT NOT NULL DEFAULT '',
-    address TEXT NOT NULL DEFAULT '',
-    receipt_date TEXT NOT NULL DEFAULT '',
-    currency TEXT NOT NULL DEFAULT '',
+    merchant TEXT DEFAULT '',
+    address TEXT DEFAULT '',
+    receipt_date TEXT DEFAULT '',
+    currency TEXT DEFAULT '',
     subtotal DOUBLE PRECISION,
     tax DOUBLE PRECISION,
     tip DOUBLE PRECISION,
     total DOUBLE PRECISION,
-    receipt_number TEXT NOT NULL DEFAULT '',
-    processing_status TEXT NOT NULL DEFAULT 'uploaded',
-    review_status TEXT NOT NULL DEFAULT 'draft',
-    error_message TEXT NOT NULL DEFAULT ''
+    receipt_number TEXT DEFAULT '',
+    processing_status TEXT DEFAULT 'uploaded',
+    review_status TEXT DEFAULT 'draft',
+    error_message TEXT DEFAULT '',
+    pdf_url TEXT DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS forms (
     id TEXT PRIMARY KEY,
     receipt_id TEXT NOT NULL UNIQUE REFERENCES receipts(id) ON DELETE RESTRICT,
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    form_type TEXT NOT NULL DEFAULT 'Hospitality Expense',
-    expense_category TEXT NOT NULL DEFAULT 'Other',
-    host TEXT NOT NULL DEFAULT '',
-    hosted_persons JSONB NOT NULL DEFAULT '[]'::jsonb,
-    occasion TEXT NOT NULL DEFAULT '',
+    form_type TEXT DEFAULT 'Hospitality Expense',
+    expense_category TEXT DEFAULT 'Other',
+    host TEXT DEFAULT '',
+    hosted_persons JSONB DEFAULT '[]'::jsonb,
+    occasion TEXT DEFAULT '',
     date_of_hospitality TEXT,
-    location_of_hospitality TEXT NOT NULL DEFAULT '',
+    location_of_hospitality TEXT DEFAULT '',
     invoice_amount DOUBLE PRECISION,
     tip DOUBLE PRECISION,
     total_amount DOUBLE PRECISION,
-    merchant TEXT NOT NULL DEFAULT '',
-    receipt_number TEXT NOT NULL DEFAULT '',
+    merchant TEXT DEFAULT '',
+    receipt_number TEXT DEFAULT '',
     form_date TEXT,
-    place TEXT NOT NULL DEFAULT '',
-    missing_fields JSONB NOT NULL DEFAULT '[]'::jsonb,
-    needs_manual_review BOOLEAN NOT NULL DEFAULT FALSE,
-    ai_confidence JSONB NOT NULL DEFAULT '{}'::jsonb,
-    status TEXT NOT NULL DEFAULT 'draft',
+    place TEXT DEFAULT '',
+    missing_fields JSONB DEFAULT '[]'::jsonb,
+    needs_manual_review BOOLEAN DEFAULT FALSE,
+    ai_confidence JSONB DEFAULT '{}'::jsonb,
+    status TEXT DEFAULT 'draft',
+    rejection_reason TEXT DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -71,8 +73,16 @@ CREATE TABLE IF NOT EXISTS combined_documents (
     email_sent BOOLEAN NOT NULL DEFAULT FALSE,
     email_sent_at TIMESTAMPTZ,
     email_message_id TEXT,
-    email_delivery_status TEXT NOT NULL DEFAULT 'pending',
-    user_email TEXT NOT NULL DEFAULT ''
+    email_delivery_status TEXT DEFAULT 'pending',
+    email_error TEXT,
+    user_email TEXT DEFAULT '',
+    merchant TEXT DEFAULT '',
+    category TEXT DEFAULT 'Other',
+    host TEXT DEFAULT '',
+    occasion TEXT DEFAULT '',
+    total_amount DOUBLE PRECISION,
+    currency TEXT DEFAULT 'EUR',
+    status TEXT DEFAULT 'processing'
 );
 
 CREATE TABLE IF NOT EXISTS audit_logs (
@@ -83,7 +93,16 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     details JSONB NOT NULL DEFAULT '{}'::jsonb,
     ip_address TEXT NOT NULL DEFAULT '',
     user_agent TEXT NOT NULL DEFAULT '',
-    session_id TEXT NOT NULL DEFAULT ''
+    session_id TEXT NOT NULL DEFAULT '',
+    read_by JSONB NOT NULL DEFAULT '[]'::jsonb
+);
+
+CREATE TABLE IF NOT EXISTS analytics_cache (
+    id TEXT PRIMARY KEY,
+    generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    start_date TEXT NOT NULL DEFAULT '',
+    end_date TEXT NOT NULL DEFAULT '',
+    data JSONB NOT NULL DEFAULT '{}'::jsonb
 );
 
 CREATE INDEX IF NOT EXISTS idx_receipts_user_id ON receipts(user_id);

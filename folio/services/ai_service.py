@@ -11,6 +11,8 @@ from datetime import datetime
 from statistics import mean
 from typing import Any
 
+import httpx
+
 from middleware.auth_middleware import sanitize_ocr_text
 from prompts.ai_prompts import (
     ALLOWED_EXPENSE_CATEGORIES,
@@ -79,7 +81,10 @@ class AiService:
         if client is not None:
             self._client = client
         elif OpenAI is not None and resolved_key:
-            self._client = OpenAI(api_key=resolved_key)
+            self._client = OpenAI(
+                api_key=resolved_key,
+                http_client=httpx.Client(trust_env=False),
+            )
         else:
             self._client = None
         self._model = model
@@ -128,7 +133,8 @@ class AiService:
                 },
             )
 
-            form_repository.create_form_from_ai_result(receipt_id, validated)
+            user_id = self._resolve_receipt_user_id(receipt_id)
+            form_repository.create_form_from_ai_result(receipt_id, user_id, validated)
             self._log_token_usage(receipt_id, usage)
             return validated
         except Exception as exc:
@@ -157,6 +163,13 @@ class AiService:
                     self._sleep(5)
                     continue
                 raise
+
+    def _resolve_receipt_user_id(self, receipt_id: str) -> str:
+        try:
+            receipt = receipt_repository.get_receipt(receipt_id)
+        except Exception:
+            return ""
+        return receipt.userId if receipt is not None else ""
 
     def _safe_parse_json(self, content: str) -> dict:
         try:
@@ -231,9 +244,45 @@ class AiService:
             except ValueError:
                 return None
 
-        def extract_labeled_amount(patterns: list[str]) -> float | None:
-            for pattern in patterns:
-                match = re.search(pattern, text, flags=re.IGNORECASE)
+        def extract_line_amount(line: str, label_patterns: list[str]) -> float | None:
+            normalized_line = line.strip()
+            for label_pattern in label_patterns:
+                label_first = re.search(
+                    rf"{label_pattern}[^\d\-+€$£]*([€$£]?\s*[0-9][0-9., ]*)",
+                    normalized_line,
+                    flags=re.IGNORECASE,
+                )
+                if label_first:
+                    amount = parse_amount(label_first.group(1))
+                    if amount is not None and amount >= 0:
+                        return amount
+                amount_first = re.search(
+                    rf"([€$£]?\s*[0-9][0-9., ]*)[^\w\d]+{label_pattern}",
+                    normalized_line,
+                    flags=re.IGNORECASE,
+                )
+                if amount_first:
+                    amount = parse_amount(amount_first.group(1))
+                    if amount is not None and amount >= 0:
+                        return amount
+            return None
+
+        def extract_labeled_amount(label_patterns: list[str], *, excluded_patterns: list[str] | None = None) -> float | None:
+            excluded_patterns = excluded_patterns or []
+            for line in lines:
+                if any(re.search(pattern, line, flags=re.IGNORECASE) for pattern in excluded_patterns):
+                    continue
+                amount = extract_line_amount(line, label_patterns)
+                if amount is not None:
+                    return amount
+            for pattern in label_patterns:
+                if any(pattern == excluded for excluded in excluded_patterns):
+                    continue
+                match = re.search(
+                    rf"{pattern}[^\d\-+€$£]*([€$£]?\s*[0-9][0-9., ]*)",
+                    text,
+                    flags=re.IGNORECASE,
+                )
                 if not match:
                     continue
                 amount = parse_amount(match.group(1))
@@ -241,31 +290,29 @@ class AiService:
                     return amount
             return None
 
+        labeled_amounts = {
+            "subtotal": extract_labeled_amount(
+                [r"\bsubtotal\b", r"\bsub\s*total\b", r"\bnetto\b", r"\bzwischensumme\b"]
+            ),
+            "tax": extract_labeled_amount(
+                [r"\btax\b", r"\bvat\b", r"\bmwst\.?\b", r"\bust\.?\b"]
+            ),
+            "tip": extract_labeled_amount(
+                [r"\btip\b", r"\btrinkgeld\b"]
+            ),
+            "total": extract_labeled_amount(
+                [r"\btotal\b", r"\bgrand\s+total\b", r"\bgesamt(?:betrag)?\b", r"\bsumme\b"],
+                excluded_patterns=[r"\bsubtotal\b", r"\bsub\s*total\b"],
+            ),
+        }
+        for field, amount in labeled_amounts.items():
+            if amount is not None:
+                payload[field] = amount
+
         if payload.get("total") is None:
-            payload["total"] = extract_labeled_amount(
-                [
-                    r"(?:total|gesamt(?:betrag)?|summe)\s*[:\-]?\s*([0-9][0-9., ]{1,})",
-                    r"([0-9][0-9., ]{1,})\s*(?:eur|€)\s*(?:total|gesamt(?:betrag)?|summe)",
-                ]
-            )
-        if payload.get("subtotal") is None:
-            payload["subtotal"] = extract_labeled_amount(
-                [
-                    r"(?:subtotal|netto|zwischensumme)\s*[:\-]?\s*([0-9][0-9., ]{1,})",
-                ]
-            )
-        if payload.get("tax") is None:
-            payload["tax"] = extract_labeled_amount(
-                [
-                    r"(?:tax|vat|mwst(?:\.|)|ust)\s*[:\-]?\s*([0-9][0-9., ]{1,})",
-                ]
-            )
-        if payload.get("tip") is None:
-            payload["tip"] = extract_labeled_amount(
-                [
-                    r"(?:tip|trinkgeld)\s*[:\-]?\s*([0-9][0-9., ]{1,})",
-                ]
-            )
+            parts = [payload.get("subtotal"), payload.get("tax"), payload.get("tip")]
+            if payload.get("subtotal") is not None and any(value is not None for value in parts[1:]):
+                payload["total"] = round(sum(float(value or 0) for value in parts), 2)
 
         if payload.get("date") is None:
             iso_match = re.search(r"\b(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})\b", text)

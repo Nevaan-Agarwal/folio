@@ -2,7 +2,7 @@ import json
 
 from flask import Blueprint, g, jsonify, render_template, request, url_for
 
-from config import firebase as firebase_config
+from config import database as database_config
 from middleware.auth_middleware import require_auth
 from repositories import audit_repository
 
@@ -140,9 +140,9 @@ def _load_filters(raw_filters: str | None) -> dict:
 
 
 def _fetch_combined_documents(user_id: str, role: str, query: str) -> list[tuple[str, dict]]:
-    if firebase_config.db is None:
+    if database_config.db is None:
         return []
-    collection = firebase_config.db.collection("combined_documents")
+    collection = database_config.db.collection("combined_documents")
     if role != "admin":
         docs = collection.where("userId", "==", user_id).stream()
         rows = [(doc.id, doc.to_dict() or {}) for doc in docs]
@@ -176,12 +176,12 @@ def _build_search_result(doc_id: str, payload: dict) -> dict:
     receipt_id = payload.get("receiptId", "")
     form = {}
     receipt = {}
-    if firebase_config.db is not None and form_id:
-        form_doc = firebase_config.db.collection("forms").document(form_id).get()
+    if database_config.db is not None and form_id:
+        form_doc = database_config.db.collection("forms").document(form_id).get()
         if form_doc.exists:
             form = form_doc.to_dict() or {}
-    if firebase_config.db is not None and receipt_id:
-        receipt_doc = firebase_config.db.collection("receipts").document(receipt_id).get()
+    if database_config.db is not None and receipt_id:
+        receipt_doc = database_config.db.collection("receipts").document(receipt_id).get()
         if receipt_doc.exists:
             receipt = receipt_doc.to_dict() or {}
 

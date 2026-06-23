@@ -12,7 +12,7 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from config import firebase as firebase_config
+from config import database as database_config
 from repositories import audit_repository, combined_document_repository
 
 
@@ -145,7 +145,7 @@ class EmailService:
             f"Folio_Expense_{form_data.get('merchant', 'merchant')}_{form_data.get('date') or form_data.get('dateOfHospitality') or 'date'}.pdf"
         )
 
-        firebase_config.db.collection("combined_documents").document(document_id).set(
+        database_config.db.collection("combined_documents").document(document_id).set(
             {"emailDeliveryStatus": "pending", "emailError": None},
             merge=True,
         )
@@ -160,7 +160,7 @@ class EmailService:
             )
             if error:
                 friendly_error = self._humanize_delivery_error(error)
-                firebase_config.db.collection("combined_documents").document(document_id).set(
+                database_config.db.collection("combined_documents").document(document_id).set(
                     {
                         "emailSent": True,
                         "emailSentAt": datetime.now(timezone.utc).isoformat(),
@@ -174,8 +174,8 @@ class EmailService:
 
             combined_document_repository.update_email_status(document_id, "sent", message_id)
             payload = {}
-            if firebase_config.db is not None:
-                document = firebase_config.db.collection("combined_documents").document(document_id).get()
+            if database_config.db is not None:
+                document = database_config.db.collection("combined_documents").document(document_id).get()
                 payload = document.to_dict() if document.exists else {}
             audit_repository.create_log(
                 user_id=payload.get("userId", ""),
@@ -189,7 +189,7 @@ class EmailService:
             return {"success": True, "message_id": message_id, "error": None}
         except Exception as exc:
             friendly_error = self._humanize_delivery_error(str(exc))
-            firebase_config.db.collection("combined_documents").document(document_id).set(
+            database_config.db.collection("combined_documents").document(document_id).set(
                 {
                     "emailSent": True,
                     "emailSentAt": datetime.now(timezone.utc).isoformat(),

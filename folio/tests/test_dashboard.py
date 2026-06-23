@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from app import create_app
-from config import firebase as firebase_config
+from config import database as database_config
 
 
 class _FakeDoc:
@@ -80,7 +80,7 @@ def _seed_data():
 
 def test_dashboard_loads_for_employee(monkeypatch):
     app = create_app("testing")
-    monkeypatch.setattr(firebase_config, "db", _FakeDB(_seed_data()))
+    monkeypatch.setattr(database_config, "db", _FakeDB(_seed_data()))
     with app.test_client() as client:
         _session(client, "u1", "employee", "Alice")
         response = client.get("/dashboard")
@@ -93,7 +93,7 @@ def test_dashboard_loads_for_employee(monkeypatch):
 
 def test_dashboard_loads_for_admin(monkeypatch):
     app = create_app("testing")
-    monkeypatch.setattr(firebase_config, "db", _FakeDB(_seed_data()))
+    monkeypatch.setattr(database_config, "db", _FakeDB(_seed_data()))
     with app.test_client() as client:
         _session(client, "admin", "admin", "Admin")
         response = client.get("/dashboard")
@@ -105,7 +105,7 @@ def test_dashboard_loads_for_admin(monkeypatch):
 
 def test_pending_review_banner_shows_correctly(monkeypatch):
     app = create_app("testing")
-    monkeypatch.setattr(firebase_config, "db", _FakeDB(_seed_data()))
+    monkeypatch.setattr(database_config, "db", _FakeDB(_seed_data()))
     with app.test_client() as client:
         _session(client, "u1", "employee", "Alice")
         response = client.get("/dashboard")
@@ -117,7 +117,7 @@ def test_pending_review_banner_shows_correctly(monkeypatch):
 
 def test_recent_submissions_limited_to_5(monkeypatch):
     app = create_app("testing")
-    monkeypatch.setattr(firebase_config, "db", _FakeDB(_seed_data()))
+    monkeypatch.setattr(database_config, "db", _FakeDB(_seed_data()))
     with app.test_client() as client:
         _session(client, "u1", "employee", "Alice")
         response = client.get("/dashboard")
@@ -128,7 +128,7 @@ def test_recent_submissions_limited_to_5(monkeypatch):
 
 def test_stats_calculate_correctly(monkeypatch):
     app = create_app("testing")
-    monkeypatch.setattr(firebase_config, "db", _FakeDB(_seed_data()))
+    monkeypatch.setattr(database_config, "db", _FakeDB(_seed_data()))
     with app.test_client() as client:
         _session(client, "u1", "employee", "Alice")
         response = client.get("/dashboard")

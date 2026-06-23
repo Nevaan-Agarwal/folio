@@ -120,7 +120,7 @@ def _resolve_local_image_path(image_url: str) -> Path | None:
 def process_receipt_pipeline(receipt_id: str, image_url: str, user_id: str):
     """
     Runs the complete pipeline in a background thread:
-    1. Download image from Firebase Storage to temp file
+    1. Download image from local storage to temp file
     2. Run OCR (updates status to ocr_processing -> ocr_complete)
     3. Run AI processing (updates status to ai_processing -> awaiting_review)
     4. On completion: update status to awaiting_review

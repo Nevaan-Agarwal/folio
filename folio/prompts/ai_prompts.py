@@ -18,6 +18,8 @@ CRITICAL RULES:
 - Use receipt conventions and nearby labels to extract as many fields as possible
 - Infer structured values when explicitly derivable (for example date formats or EUR symbols)
 - Amounts must always be numbers (float), never strings
+- Do not move amounts between fields. A value labeled subtotal/netto/zwischensumme belongs in subtotal, tax/vat/mwst/ust belongs in tax, tip/trinkgeld belongs in tip, and total/gesamt/summe belongs in total.
+- The total field must be the final payable amount, not the subtotal. If both subtotal and total are present, keep them separate even when total appears later in the receipt.
 - Dates must be in ISO format: YYYY-MM-DD
 - The missingFields array must list every field that returned null
 - The category must always be one of the allowed values

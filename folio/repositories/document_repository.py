@@ -1,10 +1,10 @@
-"""Combined document repository for Firestore operations."""
+"""Combined document repository for SQL-backed document records."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from config import firebase as firebase_config
+from config import database as database_config
 from models.document import CombinedDocumentModel
 from repositories import audit_repository
 
@@ -39,16 +39,16 @@ def _to_combined_document(doc_id: str, data: dict | None) -> CombinedDocumentMod
 
 
 def get_document(doc_id: str) -> CombinedDocumentModel | None:
-    if firebase_config.db is None:
+    if database_config.db is None:
         return None
-    doc = firebase_config.db.collection("combined_documents").document(doc_id).get()
+    doc = database_config.db.collection("combined_documents").document(doc_id).get()
     if not doc.exists:
         return None
     return _to_combined_document(doc.id, doc.to_dict())
 
 
 def update_email_status(doc_id: str, status: str, message_id: str | None) -> None:
-    if firebase_config.db is None:
+    if database_config.db is None:
         return
     payload = {
         "emailDeliveryStatus": status,
@@ -58,7 +58,7 @@ def update_email_status(doc_id: str, status: str, message_id: str | None) -> Non
         "emailError": None,
     }
     try:
-        firebase_config.db.collection("combined_documents").document(doc_id).set(payload, merge=True)
+        database_config.db.collection("combined_documents").document(doc_id).set(payload, merge=True)
         audit_repository.create_log(
             user_id="system",
             action="db_transaction",
@@ -88,7 +88,7 @@ def save_document(document_data: dict) -> str:
     """Backward-compatible helper for legacy callers."""
     user_id = str((document_data or {}).get("userId") or "system")
     try:
-        ref = firebase_config.db.collection("combined_documents").document()
+        ref = database_config.db.collection("combined_documents").document()
         ref.set(document_data)
         audit_repository.create_log(
             user_id=user_id,
@@ -117,10 +117,10 @@ def save_document(document_data: dict) -> str:
 
 
 def delete_document(doc_id: str) -> None:
-    if firebase_config.db is None:
+    if database_config.db is None:
         return
     try:
-        firebase_config.db.collection("combined_documents").document(doc_id).delete()
+        database_config.db.collection("combined_documents").document(doc_id).delete()
         audit_repository.create_log(
             user_id="system",
             action="db_transaction",

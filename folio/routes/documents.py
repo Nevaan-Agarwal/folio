@@ -13,7 +13,7 @@ from repositories import (
     user_repository,
 )
 from services import email_service
-from config import firebase as firebase_config
+from config import database as database_config
 
 documents_bp = Blueprint("documents", __name__)
 
@@ -37,7 +37,7 @@ def resend_email(doc_id: str):
             400,
         )
 
-    blob = firebase_config.bucket.blob(document.filePath)
+    blob = database_config.bucket.blob(document.filePath)
     pdf_bytes = blob.download_as_bytes()
 
     form = form_repository.get_form(document.formId)
@@ -74,9 +74,9 @@ def delete_submission(doc_id: str):
     if document.userId != g.user.get("uid") and not is_admin:
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
-    if firebase_config.bucket is not None and document.filePath:
+    if database_config.bucket is not None and document.filePath:
         try:
-            firebase_config.bucket.blob(document.filePath).delete()
+            database_config.bucket.blob(document.filePath).delete()
         except Exception:
             # File cleanup should not block deletion of metadata.
             pass

@@ -4,6 +4,7 @@ from app import create_app
 from models.user import UserModel
 from routes import admin as admin_routes
 from routes import auth as auth_routes
+from werkzeug.security import generate_password_hash
 
 
 def _admin_session(client):
@@ -66,17 +67,12 @@ def test_last_admin_cannot_be_demoted(monkeypatch):
     assert "last admin" in response.get_json()["message"].lower()
 
 
-def test_promotion_updates_firestore_role(monkeypatch):
+def test_promotion_updates_database_role(monkeypatch):
     app = create_app("testing")
     calls = {}
     monkeypatch.setattr(admin_routes.user_repository, "get_user", lambda uid: _user(uid, "employee"))
     monkeypatch.setattr(admin_routes.user_repository, "update_user", lambda uid, data: calls.update({"uid": uid, "data": data}))
     monkeypatch.setattr(admin_routes.audit_repository, "create_log", lambda *args, **kwargs: None)
-    monkeypatch.setattr(
-        admin_routes.firebase_config,
-        "firebase_auth",
-        type("Auth", (), {"set_custom_user_claims": staticmethod(lambda uid, claims: None)})(),
-    )
     with app.test_client() as client:
         _admin_session(client)
         response = client.post("/admin/users/user-1/promote")
@@ -97,11 +93,6 @@ def test_promotion_creates_audit_log(monkeypatch):
             {"user_id": user_id, "action": action, "details": details or {}}
         ),
     )
-    monkeypatch.setattr(
-        admin_routes.firebase_config,
-        "firebase_auth",
-        type("Auth", (), {"set_custom_user_claims": staticmethod(lambda uid, claims: None)})(),
-    )
     with app.test_client() as client:
         _admin_session(client)
         response = client.post("/admin/users/user-1/promote")
@@ -114,19 +105,19 @@ def test_promotion_creates_audit_log(monkeypatch):
 def test_deactivated_user_cannot_login(monkeypatch):
     app = create_app("testing")
     monkeypatch.setattr(
-        auth_routes,
-        "_firebase_sign_in",
-        lambda email, password: {"idToken": "valid-id-token"},
-    )
-    monkeypatch.setattr(
-        auth_routes.firebase_config,
-        "firebase_auth",
-        type("Auth", (), {"verify_id_token": staticmethod(lambda token: {"uid": "uid-123"})})(),
-    )
-    monkeypatch.setattr(
         auth_routes.user_repository,
-        "get_user",
-        lambda uid: _user(uid, "employee", disabled=True),
+        "get_user_by_email",
+        lambda email: UserModel(
+            id="uid-123",
+            firstName="Alice",
+            surname="Meyer",
+            email="uid-123@example.com",
+            passwordHash=generate_password_hash("StrongPass9"),
+            role="employee",
+            language="en",
+            disabled=True,
+            createdAt=datetime.now(timezone.utc),
+        ),
     )
     with app.test_client() as client:
         response = client.post(

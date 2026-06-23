@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from config import firebase as firebase_config
+from config import database as database_config
 
 ALLOWED_ACTIONS = {
     "user_registered",
@@ -89,9 +89,13 @@ def _to_model(doc_id: str, payload: dict | None) -> AuditLogModel | None:
 
 
 def _write_audit_log(payload: dict) -> None:
-    if firebase_config.db is None:
+    if database_config.db is None:
         return
-    firebase_config.db.collection("auditLogs").add(payload)
+    try:
+        database_config.db.collection("auditLogs").add(payload)
+    except Exception:
+        # Audit logging is best-effort and must not leak background thread failures.
+        return
 
 
 def create_log(user_id, action: str, details: dict | None = None, request=None) -> None:
@@ -120,10 +124,10 @@ def create_log(user_id, action: str, details: dict | None = None, request=None) 
 
 
 def get_user_logs(user_id: str, limit: int = 50) -> list[AuditLogModel]:
-    if firebase_config.db is None:
+    if database_config.db is None:
         return []
     models: list[AuditLogModel] = []
-    docs = firebase_config.db.collection("auditLogs").where("userId", "==", str(user_id)).stream()
+    docs = database_config.db.collection("auditLogs").where("userId", "==", str(user_id)).stream()
     for doc in docs:
         model = _to_model(doc.id, doc.to_dict())
         if model:
@@ -135,9 +139,9 @@ def get_user_logs(user_id: str, limit: int = 50) -> list[AuditLogModel]:
 def get_all_logs(
     limit: int = 100, action_filter: str | None = None, requester_role: str = "employee"
 ) -> list[AuditLogModel]:
-    if requester_role != "admin" or firebase_config.db is None:
+    if requester_role != "admin" or database_config.db is None:
         return []
-    docs = firebase_config.db.collection("auditLogs").stream()
+    docs = database_config.db.collection("auditLogs").stream()
     models: list[AuditLogModel] = []
     for doc in docs:
         model = _to_model(doc.id, doc.to_dict())
@@ -163,9 +167,9 @@ def get_unread_notification_count(user_id: str) -> int:
 
 
 def mark_notification_read(user_id: str, notification_id: str) -> bool:
-    if firebase_config.db is None:
+    if database_config.db is None:
         return False
-    doc_ref = firebase_config.db.collection("auditLogs").document(notification_id)
+    doc_ref = database_config.db.collection("auditLogs").document(notification_id)
     snapshot = doc_ref.get()
     if not snapshot.exists:
         return False

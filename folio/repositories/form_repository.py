@@ -1,10 +1,10 @@
-"""Form repository for Firestore operations."""
+"""Form repository for SQL-backed form records."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from config import firebase as firebase_config
+from config import database as database_config
 from models.form import FormModel
 from repositories import audit_repository, receipt_repository
 
@@ -12,7 +12,7 @@ from repositories import audit_repository, receipt_repository
 def save_form(form_data: dict) -> str:
     user_id = str((form_data or {}).get("userId") or "system")
     try:
-        ref = firebase_config.db.collection("forms").document()
+        ref = database_config.db.collection("forms").document()
         ref.set(form_data)
         audit_repository.create_log(
             user_id=user_id,
@@ -93,7 +93,8 @@ def create_form_from_ai_result(
     # Backward compatibility: old call style create_form_from_ai_result(receipt_id, ai_result)
     if ai_result is None and isinstance(user_id, dict):
         ai_result = user_id
-        user_id = ""
+        receipt = receipt_repository.get_receipt(receipt_id)
+        user_id = receipt.userId if receipt is not None else ""
     ai_result = ai_result or {}
     user_id = str(user_id or "")
 
@@ -124,7 +125,7 @@ def create_form_from_ai_result(
         "updatedAt": now_iso,
     }
     try:
-        ref = firebase_config.db.collection("forms").document(receipt_id)
+        ref = database_config.db.collection("forms").document(receipt_id)
         ref.set(payload, merge=True)
         if not ref.get().exists:
             raise RuntimeError("Failed to persist generated form.")
@@ -155,14 +156,14 @@ def create_form_from_ai_result(
 
 
 def get_form(form_id: str) -> FormModel | None:
-    doc = firebase_config.db.collection("forms").document(form_id).get()
+    doc = database_config.db.collection("forms").document(form_id).get()
     if not doc.exists:
         return None
     return _to_form_model(doc.id, doc.to_dict())
 
 
 def get_form_by_receipt(receipt_id: str) -> FormModel | None:
-    doc = firebase_config.db.collection("forms").document(receipt_id).get()
+    doc = database_config.db.collection("forms").document(receipt_id).get()
     if not doc.exists:
         return None
     return _to_form_model(doc.id, doc.to_dict())
@@ -173,7 +174,7 @@ def update_form(form_id: str, data: dict) -> None:
     payload["updatedAt"] = datetime.now(timezone.utc).isoformat()
     user_id = str(payload.get("userId") or "system")
     try:
-        firebase_config.db.collection("forms").document(form_id).set(payload, merge=True)
+        database_config.db.collection("forms").document(form_id).set(payload, merge=True)
         audit_repository.create_log(
             user_id=user_id,
             action="db_transaction",
@@ -224,10 +225,10 @@ def reject_form(form_id: str, reason: str) -> None:
 
 
 def delete_form(form_id: str) -> None:
-    if firebase_config.db is None:
+    if database_config.db is None:
         return
     try:
-        firebase_config.db.collection("forms").document(form_id).delete()
+        database_config.db.collection("forms").document(form_id).delete()
         audit_repository.create_log(
             user_id="system",
             action="db_transaction",

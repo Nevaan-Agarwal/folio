@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
-from config import firebase as firebase_config
+from config import database as database_config
 from repositories import form_repository, user_repository
 
 
@@ -51,10 +51,10 @@ class AnalyticsService:
         return start, end
 
     def _load_documents(self, start_date: str, end_date: str) -> list[dict]:
-        if firebase_config.db is None:
+        if database_config.db is None:
             return []
         query = (
-            firebase_config.db.collection("combined_documents")
+            database_config.db.collection("combined_documents")
             .where("createdAt", ">=", f"{start_date}T00:00:00+00:00")
             .where("createdAt", "<=", f"{end_date}T23:59:59+00:00")
         )
@@ -182,14 +182,14 @@ class AnalyticsService:
         }
 
     def get_dashboard_data(self, start_date=None, end_date=None) -> dict:
-        if firebase_config.db is None:
+        if database_config.db is None:
             return self._compute([])
 
         default_start, default_end = self._default_range()
         start_date = start_date or default_start
         end_date = end_date or default_end
         key = self._cache_key(start_date, end_date)
-        cache_ref = firebase_config.db.collection(self.CACHE_COLLECTION).document(key)
+        cache_ref = database_config.db.collection(self.CACHE_COLLECTION).document(key)
         cache_doc = cache_ref.get()
         cache_payload = cache_doc.to_dict() if cache_doc.exists else None
         if cache_payload and not self._should_refresh(cache_payload):

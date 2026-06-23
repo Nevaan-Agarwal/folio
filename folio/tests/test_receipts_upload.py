@@ -41,8 +41,8 @@ def test_upload_creates_storage_file(monkeypatch):
     assert calls["storage"] == 1
 
 
-def test_upload_creates_firestore_record(monkeypatch):
-    calls = {"firestore": 0}
+def test_upload_creates_database_record(monkeypatch):
+    calls = {"database": 0}
     app = create_app("testing")
 
     monkeypatch.setattr(
@@ -53,7 +53,7 @@ def test_upload_creates_firestore_record(monkeypatch):
     monkeypatch.setattr(
         receipts_routes.receipt_repository,
         "create_receipt",
-        lambda user_id, image_url, receipt_id=None: calls.__setitem__("firestore", calls["firestore"] + 1) or (receipt_id or "receipt-1"),
+        lambda user_id, image_url, receipt_id=None: calls.__setitem__("database", calls["database"] + 1) or (receipt_id or "receipt-1"),
     )
     monkeypatch.setattr(receipts_routes.audit_repository, "log_event", lambda event: None)
 
@@ -66,7 +66,7 @@ def test_upload_creates_firestore_record(monkeypatch):
         )
 
     assert response.status_code == 200
-    assert calls["firestore"] == 1
+    assert calls["database"] == 1
 
 
 def test_upload_returns_before_ocr_completes(monkeypatch):

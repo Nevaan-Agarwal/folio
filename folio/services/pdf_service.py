@@ -12,7 +12,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from urllib.parse import unquote, urlparse
 
-from config import firebase as firebase_config
+from config import database as database_config
 from repositories import audit_repository
 from services import email_service
 
@@ -132,7 +132,7 @@ class PdfService:
         return Paragraph("<b><font color='#E07E00'>Folio</font></b>", self.styles["Title"])
 
     def _fetch_form_data(self, form_id: str) -> dict:
-        doc = firebase_config.db.collection("forms").document(form_id).get()
+        doc = database_config.db.collection("forms").document(form_id).get()
         if not doc.exists:
             raise ValueError("Form not found.")
         payload = doc.to_dict() or {}
@@ -140,7 +140,7 @@ class PdfService:
         return payload
 
     def _fetch_receipt_data(self, receipt_id: str) -> dict:
-        doc = firebase_config.db.collection("receipts").document(receipt_id).get()
+        doc = database_config.db.collection("receipts").document(receipt_id).get()
         if not doc.exists:
             raise ValueError("Receipt not found.")
         payload = doc.to_dict() or {}
@@ -148,7 +148,7 @@ class PdfService:
         return payload
 
     def _fetch_user_data(self, user_id: str) -> dict:
-        doc = firebase_config.db.collection("users").document(user_id).get()
+        doc = database_config.db.collection("users").document(user_id).get()
         if not doc.exists:
             return {"firstName": "", "surname": "", "email": ""}
         return doc.to_dict() or {}
@@ -403,7 +403,7 @@ class PdfService:
     def _upload_pdf(self, user_id: str, document_id: str, pdf_bytes: bytes) -> tuple[str, str]:
         date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
         storage_path = f"combined_documents/{user_id}/{document_id}/folio_{date_str}.pdf"
-        blob = firebase_config.bucket.blob(storage_path)
+        blob = database_config.bucket.blob(storage_path)
         blob.upload_from_string(pdf_bytes, content_type="application/pdf")
         try:
             url = blob.generate_signed_url(expiration=365 * 24 * 60 * 60)
@@ -446,7 +446,7 @@ class PdfService:
             "createdAt": datetime.now(timezone.utc).isoformat(),
         }
         try:
-            doc_ref = firebase_config.db.collection("combined_documents").document(document_id)
+            doc_ref = database_config.db.collection("combined_documents").document(document_id)
             doc_ref.set(payload)
             saved = doc_ref.get()
             if not saved.exists:
@@ -517,7 +517,7 @@ class PdfService:
                 form_data,
                 receipt_data,
             )
-            receipt_ref = firebase_config.db.collection("receipts").document(receipt_id)
+            receipt_ref = database_config.db.collection("receipts").document(receipt_id)
             try:
                 receipt_ref.set(
                     {"processingStatus": "pdf_generated", "pdfUrl": download_url},

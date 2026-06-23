@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 
 from flask import Blueprint, Response, g, jsonify, render_template, request, url_for
 
-from config import firebase as firebase_config
+from config import database as database_config
 from repositories import audit_repository, form_repository, receipt_repository, user_repository
 from services.analytics_service import analytics_service
 
@@ -41,6 +41,8 @@ def _to_float(value) -> float:
 def _to_iso_date(value: str | None) -> str | None:
     if not value:
         return None
+    if isinstance(value, datetime):
+        return value.date().isoformat()
     try:
         return datetime.fromisoformat(str(value)[:10]).date().isoformat()
     except ValueError:
@@ -48,14 +50,14 @@ def _to_iso_date(value: str | None) -> str | None:
 
 
 def _load_admin_archive_entries() -> list[dict]:
-    if firebase_config.db is None:
+    if database_config.db is None:
         return []
     users_by_id = {}
     for user in user_repository.get_all_users("admin"):
         users_by_id[user.id] = user
 
     entries = []
-    for doc in firebase_config.db.collection("combined_documents").stream():
+    for doc in database_config.db.collection("combined_documents").stream():
         payload = doc.to_dict() or {}
         user_id = payload.get("userId", "")
         form = None
@@ -72,7 +74,7 @@ def _load_admin_archive_entries() -> list[dict]:
         date_value = (
             form_data.get("date")
             or form_data.get("dateOfHospitality")
-            or payload.get("createdAt", "")[:10]
+            or _to_iso_date(payload.get("createdAt"))
         )
         entries.append(
             {
@@ -460,12 +462,12 @@ def admin_analytics_export():
 
 
 def _user_to_view_row(user) -> dict:
-    if firebase_config.db is None:
+    if database_config.db is None:
         submissions_count = 0
     else:
         submissions_count = len(
             list(
-                firebase_config.db.collection("combined_documents")
+                database_config.db.collection("combined_documents")
                 .where("userId", "==", user.id)
                 .stream()
             )
@@ -521,9 +523,9 @@ def admin_user_detail(user_id: str):
         return jsonify({"success": False, "error": "User not found"}), 404
 
     submissions = []
-    if firebase_config.db is not None:
+    if database_config.db is not None:
         for doc in (
-            firebase_config.db.collection("combined_documents")
+            database_config.db.collection("combined_documents")
             .where("userId", "==", user_id)
             .stream()
         ):

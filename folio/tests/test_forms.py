@@ -115,12 +115,19 @@ def test_total_auto_calculates():
     assert "recalcTotal" in body
 
 
-def test_approve_validates_required_fields(monkeypatch):
+def test_approve_allows_incomplete_fields(monkeypatch):
     app = create_app("testing")
+    calls = {"pdf_called": False}
     monkeypatch.setattr(
         forms_routes.form_repository,
         "get_form",
         lambda _fid: _sample_form(),
+    )
+    monkeypatch.setattr(forms_routes.form_repository, "approve_form", lambda _fid, _data: None)
+    monkeypatch.setattr(
+        forms_routes.pdf_service,
+        "generate_pdf",
+        lambda *_args: calls.__setitem__("pdf_called", True) or "ok",
     )
 
     with app.test_client() as client:
@@ -138,8 +145,8 @@ def test_approve_validates_required_fields(monkeypatch):
             },
         )
 
-    assert response.status_code == 400
-    assert "missingFields" in response.get_json()
+    assert response.status_code == 200
+    assert response.get_json()["success"] is True
 
 
 def test_draft_save_does_not_validate_required_fields(monkeypatch):

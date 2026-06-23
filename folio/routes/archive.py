@@ -6,7 +6,7 @@ from io import BytesIO
 
 from flask import Blueprint, g, jsonify, render_template, request, send_file, url_for
 
-from config import firebase as firebase_config
+from config import database as database_config
 from middleware.auth_middleware import require_auth
 from repositories import combined_document_repository, form_repository, receipt_repository
 
@@ -29,6 +29,8 @@ ALLOWED_CATEGORIES = {
 def _to_iso_date(value: str | None) -> str | None:
     if not value:
         return None
+    if isinstance(value, datetime):
+        return value.date().isoformat()
     try:
         return datetime.fromisoformat(str(value)[:10]).date().isoformat()
     except ValueError:
@@ -43,7 +45,7 @@ def _to_float(value) -> float:
 
 
 def _extract_submission(doc) -> dict:
-    if firebase_config.db is None:
+    if database_config.db is None:
         return {}
     payload = doc.to_dict() or {}
     receipt_id = payload.get("receiptId")
@@ -51,17 +53,17 @@ def _extract_submission(doc) -> dict:
     receipt = {}
     form = {}
     if receipt_id:
-        receipt_doc = firebase_config.db.collection("receipts").document(receipt_id).get()
+        receipt_doc = database_config.db.collection("receipts").document(receipt_id).get()
         if receipt_doc.exists:
             receipt = receipt_doc.to_dict() or {}
     if form_id:
-        form_doc = firebase_config.db.collection("forms").document(form_id).get()
+        form_doc = database_config.db.collection("forms").document(form_id).get()
         if form_doc.exists:
             form = form_doc.to_dict() or {}
     date_value = (
         form.get("date")
         or form.get("dateOfHospitality")
-        or payload.get("createdAt", "")[:10]
+        or _to_iso_date(payload.get("createdAt"))
     )
     document_id = payload.get("id", doc.id)
     return {
@@ -92,11 +94,11 @@ def _event_timestamp(event: dict) -> str:
 
 
 def _get_audit_timeline(document_id: str, form_id: str, receipt_id: str, user_id: str) -> list[dict]:
-    if firebase_config.db is None:
+    if database_config.db is None:
         return []
     events = []
     for doc in (
-        firebase_config.db.collection("auditLogs")
+        database_config.db.collection("auditLogs")
         .where("uid", "==", user_id)
         .stream()
     ):
@@ -126,9 +128,9 @@ def _get_audit_timeline(document_id: str, form_id: str, receipt_id: str, user_id
 def _fetch_archive_page(
     user_id: str, *, cursor: str | None = None, page_size: int = 200
 ) -> tuple[list[dict], str | None, int]:
-    if firebase_config.db is None:
+    if database_config.db is None:
         return [], None, 0
-    base_query = firebase_config.db.collection("combined_documents").where(
+    base_query = database_config.db.collection("combined_documents").where(
         "userId", "==", user_id
     )
     total_count = len(list(base_query.stream()))
@@ -294,11 +296,11 @@ def archive_document_pdf(document_id: str):
     if document.userId != g.user.get("uid") and not is_admin:
         return jsonify({"success": False, "error": "Forbidden"}), 403
 
-    if firebase_config.bucket is None or not document.filePath:
+    if database_config.bucket is None or not document.filePath:
         return jsonify({"success": False, "error": "PDF file unavailable"}), 404
 
     try:
-        blob = firebase_config.bucket.blob(document.filePath)
+        blob = database_config.bucket.blob(document.filePath)
         pdf_bytes = blob.download_as_bytes()
     except Exception:
         return jsonify({"success": False, "error": "PDF file unavailable"}), 404

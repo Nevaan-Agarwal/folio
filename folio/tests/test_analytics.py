@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from app import create_app
-from config import firebase as firebase_config
+from config import database as database_config
 from routes import admin as admin_routes
 from services.analytics_service import AnalyticsService
 
@@ -93,7 +93,7 @@ def test_analytics_calculates_total_correctly(monkeypatch):
     monkeypatch.setattr(service, "_load_documents", lambda start, end: [_doc(100), _doc(50)])
     monkeypatch.setattr(service, "_cache_key", lambda start, end: "k")
     monkeypatch.setattr(service, "_should_refresh", lambda payload: True)
-    monkeypatch.setattr(firebase_config, "db", _FakeDB())
+    monkeypatch.setattr(database_config, "db", _FakeDB())
     monkeypatch.setattr(
         admin_routes.user_repository,
         "get_all_users",
@@ -114,7 +114,7 @@ def test_spending_by_category_sums_correctly(monkeypatch):
     monkeypatch.setattr(service, "_load_documents", lambda start, end: [_doc(100, "Travel"), _doc(40, "Travel"), _doc(20, "Hotel")])
     monkeypatch.setattr(service, "_cache_key", lambda start, end: "k")
     monkeypatch.setattr(service, "_should_refresh", lambda payload: True)
-    monkeypatch.setattr(firebase_config, "db", _FakeDB())
+    monkeypatch.setattr(database_config, "db", _FakeDB())
     monkeypatch.setattr(
         __import__("services.analytics_service", fromlist=["user_repository"]).user_repository,
         "get_all_users",
@@ -159,7 +159,7 @@ def test_cache_refreshes_after_one_hour(monkeypatch):
             "data": {"kpis": {"total_spending": 1}},
         }
     }
-    monkeypatch.setattr(firebase_config, "db", fake_db)
+    monkeypatch.setattr(database_config, "db", fake_db)
     calls = {"load": 0}
     monkeypatch.setattr(
         __import__("services.analytics_service", fromlist=["user_repository"]).user_repository,

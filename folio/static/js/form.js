@@ -114,7 +114,7 @@
         missingCount += 1;
       }
     });
-    approveBtn.disabled = missingCount > 0;
+    approveBtn.disabled = false;
     completedCounter.textContent = String(completed);
     attentionCounter.textContent = String(missingCount);
     attentionLine.hidden = missingCount === 0;

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, g, render_template, url_for
 
-from config import firebase as firebase_config
+from config import database as database_config
 from middleware.auth_middleware import require_auth
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -36,6 +36,14 @@ def _to_datetime(value) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+def _to_date_text(value) -> str:
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if value:
+        return str(value)[:10]
+    return ""
+
+
 def _current_month_start(now: datetime) -> datetime:
     return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
@@ -52,9 +60,9 @@ def _get_greeting(name: str) -> str:
 
 
 def _all_docs(collection_name: str) -> list[tuple[str, dict]]:
-    if firebase_config.db is None:
+    if database_config.db is None:
         return []
-    docs = firebase_config.db.collection(collection_name).stream()
+    docs = database_config.db.collection(collection_name).stream()
     results: list[tuple[str, dict]] = []
     for doc in docs:
         results.append((doc.id, doc.to_dict() or {}))
@@ -79,7 +87,7 @@ def _build_user_dashboard(user_id: str) -> dict:
         for doc_id, payload in doc_rows
         if payload.get("userId") == user_id
     ]
-    user_docs.sort(key=lambda item: item[1].get("createdAt", ""), reverse=True)
+    user_docs.sort(key=lambda item: _to_datetime(item[1].get("createdAt")) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
 
     recent_submissions = []
     for _doc_id, payload in user_docs[:5]:
@@ -92,7 +100,7 @@ def _build_user_dashboard(user_id: str) -> dict:
             {
                 "documentId": payload.get("id") or _doc_id,
                 "merchant": payload.get("merchant") or receipt_payload.get("merchant") or "-",
-                "date": (payload.get("createdAt") or "")[:10],
+                "date": _to_date_text(payload.get("createdAt")),
                 "category": payload.get("category") or "Other",
                 "amount": total_amount,
                 "status": receipt_payload.get("processingStatus") or payload.get("status") or "processing",

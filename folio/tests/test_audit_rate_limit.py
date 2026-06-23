@@ -8,6 +8,7 @@ from models.user import UserModel
 from repositories import audit_repository
 from routes import auth as auth_routes
 from routes import receipts as receipts_routes
+from werkzeug.security import generate_password_hash
 
 
 def _login_session(client):
@@ -26,20 +27,15 @@ def test_login_creates_audit_log(monkeypatch):
     app = create_app("testing")
     rate_limiter_module.limiter.reset()
     captured = []
-    monkeypatch.setattr(auth_routes, "_firebase_sign_in", lambda email, password: {"idToken": "token"})
-    monkeypatch.setattr(
-        auth_routes.firebase_config,
-        "firebase_auth",
-        type("Auth", (), {"verify_id_token": staticmethod(lambda _token: {"uid": "uid-123"})})(),
-    )
     monkeypatch.setattr(
         auth_routes.user_repository,
-        "get_user",
-        lambda uid: UserModel(
-            id=uid,
+        "get_user_by_email",
+        lambda email: UserModel(
+            id="uid-123",
             firstName="Alice",
             surname="Meyer",
             email="alice@example.com",
+            passwordHash=generate_password_hash("StrongPass9"),
             role="employee",
             language="en",
             disabled=False,
@@ -100,11 +96,20 @@ def test_rate_limit_blocks_after_threshold(monkeypatch):
     monkeypatch.setattr(auth_routes, "_too_many_failed_attempts", lambda _key: False)
     monkeypatch.setattr(auth_routes, "_record_failed_attempt", lambda _key: None)
     monkeypatch.setattr(
-        auth_routes,
-        "_firebase_sign_in",
-        lambda email, password: (_ for _ in ()).throw(ValueError("Invalid email or password.")),
+        auth_routes.user_repository,
+        "get_user_by_email",
+        lambda email: UserModel(
+            id="uid-123",
+            firstName="Alice",
+            surname="Meyer",
+            email="alice@example.com",
+            passwordHash=generate_password_hash("StrongPass9"),
+            role="employee",
+            language="en",
+            disabled=False,
+            createdAt=None,
+        ),
     )
-    monkeypatch.setattr(auth_routes.firebase_config, "firebase_auth", object())
 
     with app.test_client() as client:
         for _ in range(5):
@@ -129,11 +134,20 @@ def test_rate_limit_resets_after_window(monkeypatch):
     monkeypatch.setattr(auth_routes, "_too_many_failed_attempts", lambda _key: False)
     monkeypatch.setattr(auth_routes, "_record_failed_attempt", lambda _key: None)
     monkeypatch.setattr(
-        auth_routes,
-        "_firebase_sign_in",
-        lambda email, password: (_ for _ in ()).throw(ValueError("Invalid email or password.")),
+        auth_routes.user_repository,
+        "get_user_by_email",
+        lambda email: UserModel(
+            id="uid-123",
+            firstName="Alice",
+            surname="Meyer",
+            email="alice@example.com",
+            passwordHash=generate_password_hash("StrongPass9"),
+            role="employee",
+            language="en",
+            disabled=False,
+            createdAt=None,
+        ),
     )
-    monkeypatch.setattr(auth_routes.firebase_config, "firebase_auth", object())
 
     from middleware import rate_limiter as rate_limiter_module
 

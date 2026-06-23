@@ -66,7 +66,7 @@ def _setup_repo_mocks(monkeypatch):
     )
     monkeypatch.setattr(
         "services.ai_service.form_repository.create_form_from_ai_result",
-        lambda receipt_id, ai_result: calls["form"].append((receipt_id, ai_result)),
+        lambda receipt_id, user_id, ai_result: calls["form"].append((receipt_id, user_id, ai_result)),
     )
     monkeypatch.setattr(
         "services.ai_service.audit_repository.log_event",
@@ -115,6 +115,37 @@ def test_amount_always_numeric_or_null(monkeypatch):
     result = service.process_receipt("r4", "some ocr text")
     assert isinstance(result["total"], float)
     assert result["tax"] is None
+
+
+def test_labeled_ocr_amounts_correct_ai_field_mismatch(monkeypatch):
+    calls = _setup_repo_mocks(monkeypatch)
+    payload = _valid_payload()
+    payload["subtotal"] = None
+    payload["tax"] = None
+    payload["tip"] = None
+    payload["total"] = 30.0
+    service = AiService(client=_build_client(payload))
+
+    result = service.process_receipt(
+        "r4b",
+        "\n".join(
+            [
+                "Merchant Cafe",
+                "Subtotal 30.00",
+                "Tax 5.00",
+                "Tip 2.00",
+                "Total 37.00",
+            ]
+        ),
+    )
+
+    assert result["subtotal"] == 30.0
+    assert result["tax"] == 5.0
+    assert result["tip"] == 2.0
+    assert result["total"] == 37.0
+    form_payload = calls["form"][0][2]
+    assert form_payload["subtotal"] == 30.0
+    assert form_payload["total"] == 37.0
 
 
 def test_date_always_iso_format_or_null(monkeypatch):

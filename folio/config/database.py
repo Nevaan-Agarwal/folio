@@ -1,4 +1,4 @@
-"""Database/storage bootstrap module (PostgreSQL + local files)."""
+"""Database and local file storage bootstrap."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from config.document_store import init_document_store
 
 db = None
 bucket = None
-firebase_auth = None  # kept for backward-compatible imports, not used anymore
 
 
 class LocalBlob:
@@ -55,9 +54,9 @@ class LocalBucket:
         return LocalBlob(self._root, relative_path)
 
 
-def init_firebase(app=None) -> None:
+def init_database(app=None) -> None:
     """Initialize PostgreSQL-backed document store and local file bucket."""
-    global db, bucket, firebase_auth
+    global db, bucket
 
     if app is not None:
         database_url = app.config.get("DATABASE_URL")
@@ -82,7 +81,7 @@ def init_firebase(app=None) -> None:
             "DATABASE_URL must be PostgreSQL in non-testing environments "
             "(postgresql://... or postgres://...)."
         )
+
     storage_root = Path(os.getenv("STORAGE_ROOT", "storage")).resolve()
     db = init_document_store(database_url)
     bucket = LocalBucket(storage_root)
-    firebase_auth = None

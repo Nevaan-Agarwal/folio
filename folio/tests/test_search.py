@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app import create_app
-from config import firebase as firebase_config
+from config import database as database_config
 
 
 class _FakeDocSnapshot:
@@ -110,7 +110,7 @@ def _session(client, uid: str, role: str):
 
 def test_search_returns_only_own_results_for_employee(monkeypatch):
     app = create_app("testing")
-    monkeypatch.setattr(firebase_config, "db", _FakeDB(_seed()))
+    monkeypatch.setattr(database_config, "db", _FakeDB(_seed()))
     with app.test_client() as client:
         _session(client, uid="u1", role="employee")
         response = client.get("/api/search?q=travel")
@@ -121,7 +121,7 @@ def test_search_returns_only_own_results_for_employee(monkeypatch):
 
 def test_admin_search_returns_all_results(monkeypatch):
     app = create_app("testing")
-    monkeypatch.setattr(firebase_config, "db", _FakeDB(_seed()))
+    monkeypatch.setattr(database_config, "db", _FakeDB(_seed()))
     with app.test_client() as client:
         _session(client, uid="admin-1", role="admin")
         response = client.get("/api/search?q=travel")
@@ -132,7 +132,7 @@ def test_admin_search_returns_all_results(monkeypatch):
 
 def test_search_by_merchant_works(monkeypatch):
     app = create_app("testing")
-    monkeypatch.setattr(firebase_config, "db", _FakeDB(_seed()))
+    monkeypatch.setattr(database_config, "db", _FakeDB(_seed()))
     with app.test_client() as client:
         _session(client, uid="u1", role="employee")
         response = client.get("/api/search?q=cafe")
@@ -144,7 +144,7 @@ def test_search_by_merchant_works(monkeypatch):
 
 def test_search_by_date_partial_works(monkeypatch):
     app = create_app("testing")
-    monkeypatch.setattr(firebase_config, "db", _FakeDB(_seed()))
+    monkeypatch.setattr(database_config, "db", _FakeDB(_seed()))
     with app.test_client() as client:
         _session(client, uid="u1", role="employee")
         response = client.get("/api/search?q=2026-01")
@@ -154,7 +154,7 @@ def test_search_by_date_partial_works(monkeypatch):
 
 def test_search_returns_correct_json_structure(monkeypatch):
     app = create_app("testing")
-    monkeypatch.setattr(firebase_config, "db", _FakeDB(_seed()))
+    monkeypatch.setattr(database_config, "db", _FakeDB(_seed()))
     with app.test_client() as client:
         _session(client, uid="u1", role="employee")
         response = client.get('/api/search?q=hotel&filters={"status":"pdf_generated"}')
@@ -168,7 +168,7 @@ def test_search_returns_correct_json_structure(monkeypatch):
 
 def test_autocomplete_returns_max_5_results(monkeypatch):
     app = create_app("testing")
-    monkeypatch.setattr(firebase_config, "db", _FakeDB(_seed()))
+    monkeypatch.setattr(database_config, "db", _FakeDB(_seed()))
     with app.test_client() as client:
         _session(client, uid="u1", role="employee")
         response = client.get("/api/search?q=a&limit=5")

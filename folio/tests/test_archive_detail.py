@@ -134,7 +134,7 @@ def test_resend_email_works(monkeypatch):
         lambda _uid: type("User", (), {"firstName": "Alice", "surname": "Meyer", "email": "alice@example.com", "language": "en"})(),
     )
     monkeypatch.setattr(
-        documents_routes.firebase_config,
+        documents_routes.database_config,
         "bucket",
         type("Bucket", (), {"blob": lambda self, path: type("Blob", (), {"download_as_bytes": lambda self: b"PDF"})()})(),
     )
@@ -214,7 +214,7 @@ def test_delete_submission_endpoint_removes_related_records(monkeypatch):
         lambda receipt_id: deleted["receipt"].append(receipt_id),
     )
     monkeypatch.setattr(
-        documents_routes.firebase_config,
+        documents_routes.database_config,
         "bucket",
         type(
             "Bucket",

@@ -1,10 +1,10 @@
-"""Receipt repository for Firestore operations."""
+"""Receipt repository for SQL-backed receipt records."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from config import firebase as firebase_config
+from config import database as database_config
 from models.receipt import ReceiptModel
 from repositories import audit_repository
 
@@ -62,7 +62,7 @@ def create_receipt(user_id: str, image_url: str, receipt_id: str | None = None) 
         "errorMessage": "",
     }
 
-    collection = firebase_config.db.collection("receipts")
+    collection = database_config.db.collection("receipts")
     try:
         if receipt_id:
             ref = collection.document(receipt_id)
@@ -114,7 +114,7 @@ def create_receipt(user_id: str, image_url: str, receipt_id: str | None = None) 
 def update_receipt(receipt_id: str, data: dict) -> None:
     user_id = str((data or {}).get("userId") or "system")
     try:
-        firebase_config.db.collection("receipts").document(receipt_id).set(data, merge=True)
+        database_config.db.collection("receipts").document(receipt_id).set(data, merge=True)
         audit_repository.create_log(
             user_id=user_id,
             action="db_transaction",
@@ -141,7 +141,7 @@ def update_receipt(receipt_id: str, data: dict) -> None:
 
 
 def get_receipt(receipt_id: str) -> ReceiptModel | None:
-    doc = firebase_config.db.collection("receipts").document(receipt_id).get()
+    doc = database_config.db.collection("receipts").document(receipt_id).get()
     if not doc.exists:
         return None
     return _to_receipt_model(receipt_id, doc.to_dict())
@@ -149,7 +149,7 @@ def get_receipt(receipt_id: str) -> ReceiptModel | None:
 
 def get_user_receipts(user_id: str) -> list[ReceiptModel]:
     docs = (
-        firebase_config.db.collection("receipts").where("userId", "==", user_id).stream()
+        database_config.db.collection("receipts").where("userId", "==", user_id).stream()
     )
     receipts: list[ReceiptModel] = []
     for doc in docs:
@@ -162,7 +162,7 @@ def get_user_receipts(user_id: str) -> list[ReceiptModel]:
 def get_all_receipts(requester_role: str = "employee") -> list[ReceiptModel]:
     if requester_role != "admin":
         raise PermissionError("Admin role required to list all receipts.")
-    docs = firebase_config.db.collection("receipts").stream()
+    docs = database_config.db.collection("receipts").stream()
     receipts: list[ReceiptModel] = []
     for doc in docs:
         model = _to_receipt_model(doc.id, doc.to_dict())
@@ -185,10 +185,10 @@ def update_review_and_processing_status(
 
 
 def delete_receipt(receipt_id: str) -> None:
-    if firebase_config.db is None:
+    if database_config.db is None:
         return
     try:
-        firebase_config.db.collection("receipts").document(receipt_id).delete()
+        database_config.db.collection("receipts").document(receipt_id).delete()
         audit_repository.create_log(
             user_id="system",
             action="db_transaction",

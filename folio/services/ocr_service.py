@@ -32,18 +32,8 @@ class OcrService:
     def __init__(self) -> None:
         if pytesseract is not None:
             configured_cmd = os.getenv("TESSERACT_CMD", "").strip()
-            candidate_paths = [
-                configured_cmd,
-                "C:/Program Files/Tesseract-OCR/tesseract.exe",
-                "C:/Users/NevaanAgarwal/AppData/Local/Programs/Tesseract-OCR/tesseract.exe",
-            ]
-            for candidate in candidate_paths:
-                if not candidate:
-                    continue
-                normalized = candidate.replace("\\", "/")
-                if Path(normalized).exists():
-                    pytesseract.pytesseract.tesseract_cmd = normalized
-                    break
+            if configured_cmd:
+                pytesseract.pytesseract.tesseract_cmd = configured_cmd
         try:
             from utils.image_processor import ImageProcessor
 
@@ -111,11 +101,12 @@ class OcrService:
                 cmd_value = ""
                 if pytesseract is not None:
                     cmd_value = getattr(pytesseract.pytesseract, "tesseract_cmd", "")
+                env_value = os.getenv("TESSERACT_CMD", "").strip()
                 return {
                     "error": (
                         "Tesseract executable not found. "
-                        "Set TESSERACT_CMD in .env (for example: "
-                        "C:/Users/NevaanAgarwal/AppData/Local/Programs/Tesseract-OCR/tesseract.exe). "
+                        "Set TESSERACT_CMD in .env to the full path of your local tesseract.exe. "
+                        f"Current env value: {env_value or 'unset'}. "
                         f"Current resolved command: {cmd_value or 'unset'}"
                     ),
                     "confidence": 0,

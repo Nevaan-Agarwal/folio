@@ -1,4 +1,5 @@
 (function () {
+  function initArchive() {
   const root = document.getElementById("archiveRoot");
   if (!root) return;
 
@@ -122,6 +123,13 @@
   loadMoreBtn?.addEventListener("click", loadMore);
 
   render();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initArchive);
+  } else {
+    initArchive();
+  }
 })();
 
 (function () {

@@ -6,7 +6,7 @@ import pytest
 
 reportlab = pytest.importorskip("reportlab")
 
-from config import firebase as firebase_config
+from config import database as database_config
 from services import pdf_service
 
 
@@ -134,8 +134,8 @@ def _setup_service(monkeypatch):
     }
     fake_db = _FakeDB(seed)
     fake_bucket = _FakeBucket()
-    monkeypatch.setattr(firebase_config, "db", fake_db)
-    monkeypatch.setattr(firebase_config, "bucket", fake_bucket)
+    monkeypatch.setattr(database_config, "db", fake_db)
+    monkeypatch.setattr(database_config, "bucket", fake_bucket)
     monkeypatch.setattr(pdf_service.urllib.request, "urlopen", lambda _url, timeout=10: _FakeUrlResponse())
 
     class _ImmediateThread:
@@ -187,12 +187,12 @@ def test_pdf_includes_receipt_image(monkeypatch):
     assert "/Subtype /Image" in content
 
 
-def test_pdf_uploads_to_firebase_storage(monkeypatch):
+def test_pdf_uploads_to_local_storage(monkeypatch):
     url, _blob, _db = _run_generation(monkeypatch)
     assert url.startswith("https://signed.local/combined_documents/user-1/")
 
 
-def test_pdf_updates_firestore_status(monkeypatch):
+def test_pdf_updates_database_status(monkeypatch):
     _url, _blob, db = _run_generation(monkeypatch)
     receipt = db.storage["receipts"]["receipt-1"]
     assert receipt["processingStatus"] == "pdf_generated"

@@ -1,11 +1,11 @@
-"""Storage service for Firebase Storage operations."""
+"""Storage service for local receipt file operations."""
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from config import firebase as firebase_config
+from config import database as database_config
 
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "heic"}
 MAX_RECEIPT_SIZE_BYTES = 15 * 1024 * 1024
@@ -46,11 +46,11 @@ def upload_receipt_image(file_object, user_id: str, receipt_id: str) -> str:
     if file_size > MAX_RECEIPT_SIZE_BYTES:
         raise StorageUploadException("File exceeds 15MB limit.")
 
-    if firebase_config.bucket is None:
+    if database_config.bucket is None:
         raise StorageUploadException("Storage bucket unavailable.")
 
     object_path = f"receipts/{user_id}/{receipt_id}/original.{extension}"
-    blob = firebase_config.bucket.blob(object_path)
+    blob = database_config.bucket.blob(object_path)
 
     try:
         file_object.stream.seek(0)

@@ -216,18 +216,6 @@ def approve_form(form_id: str):
     payload = request.get_json(silent=True) or {}
     submitted_data = _sanitize_form_input(payload)
     merged = {**_to_json_safe_form(form), **{k: v for k, v in submitted_data.items() if v is not None}}
-    blocking = [field for field in REQUIRED_FORM_FIELDS if submitted_data.get(field) in (None, "", [])]
-    if blocking:
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "message": "Required fields are missing.",
-                    "missingFields": blocking,
-                }
-            ),
-            400,
-        )
 
     approved_payload = {k: v for k, v in submitted_data.items() if v is not None}
     approved_payload["status"] = "approved"

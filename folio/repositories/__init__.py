@@ -1,5 +1,5 @@
 """Repository package exports."""
 
-from config.firebase import db
+from config.database import db
 
 __all__ = ["db"]

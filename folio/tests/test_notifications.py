@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app import create_app
-from config import firebase as firebase_config
+from config import database as database_config
 from repositories import audit_repository
 
 
@@ -91,7 +91,7 @@ class _ImmediateThread:
 
 def test_notification_created_on_ocr_complete(monkeypatch):
     fake_db = _FakeDB()
-    monkeypatch.setattr(firebase_config, "db", fake_db)
+    monkeypatch.setattr(database_config, "db", fake_db)
     monkeypatch.setattr(audit_repository.threading, "Thread", _ImmediateThread)
 
     audit_repository.create_log(
@@ -105,7 +105,7 @@ def test_notification_created_on_ocr_complete(monkeypatch):
 
 def test_notification_created_on_pdf_generated(monkeypatch):
     fake_db = _FakeDB()
-    monkeypatch.setattr(firebase_config, "db", fake_db)
+    monkeypatch.setattr(database_config, "db", fake_db)
     monkeypatch.setattr(audit_repository.threading, "Thread", _ImmediateThread)
 
     audit_repository.create_log(
@@ -124,7 +124,7 @@ def test_unread_count_accurate(monkeypatch):
         "n2": {"userId": "user-1", "action": "email_sent", "readBy": ["user-1"]},
         "n3": {"userId": "user-1", "action": "ocr_completed", "readBy": []},
     }
-    monkeypatch.setattr(firebase_config, "db", fake_db)
+    monkeypatch.setattr(database_config, "db", fake_db)
 
     assert audit_repository.get_unread_notification_count("user-1") == 2
 
@@ -135,7 +135,7 @@ def test_mark_as_read_works(monkeypatch):
     fake_db.storage["auditLogs"] = {
         "notif-1": {"userId": "user-1", "action": "pdf_generated", "readBy": []}
     }
-    monkeypatch.setattr(firebase_config, "db", fake_db)
+    monkeypatch.setattr(database_config, "db", fake_db)
 
     with app.test_client() as client:
         with client.session_transaction() as flask_session:

@@ -6,7 +6,7 @@ from pathlib import Path
 import click
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 
-from config import firebase as firebase_config
+from config import database as database_config
 from config.settings import get_config
 from middleware.rate_limiter import create_limiter
 from repositories import audit_repository, user_repository
@@ -31,7 +31,7 @@ def create_app(config_name: str | None = None) -> Flask:
     app.jinja_env.globals["t"] = translate
     app.jinja_env.globals["current_lang"] = get_current_language
 
-    firebase_config.init_firebase(app)
+    database_config.init_database(app)
 
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(dashboard_bp, url_prefix="")
@@ -80,10 +80,10 @@ def create_app(config_name: str | None = None) -> Flask:
     def health():
         now = datetime.now(timezone.utc).isoformat()
         try:
-            if firebase_config.db is None:
+            if database_config.db is None:
                 raise RuntimeError("Database client unavailable")
             doc = (
-                firebase_config.db.collection("_healthchecks")
+                database_config.db.collection("_healthchecks")
                 .document("db-connection")
                 .get()
             )

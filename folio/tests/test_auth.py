@@ -3,28 +3,19 @@ from datetime import datetime, timezone
 from app import create_app
 from models.user import UserModel
 from routes import auth as auth_routes
+from werkzeug.security import generate_password_hash
 
 
 def _mock_valid_login(monkeypatch, role="employee"):
-    class _FakeAuth:
-        @staticmethod
-        def verify_id_token(_token):
-            return {"uid": "uid-123"}
-
-    monkeypatch.setattr(
-        auth_routes,
-        "_firebase_sign_in",
-        lambda email, password: {"idToken": "valid-id-token"},
-    )
-    monkeypatch.setattr(auth_routes.firebase_config, "firebase_auth", _FakeAuth())
     monkeypatch.setattr(
         auth_routes.user_repository,
-        "get_user",
-        lambda uid: UserModel(
-            id=uid,
+        "get_user_by_email",
+        lambda email: UserModel(
+            id="uid-123",
             firstName="Alice",
             surname="Meyer",
             email="alice@example.com",
+            passwordHash=generate_password_hash("StrongPass9"),
             role=role,
             language="en",
             createdAt=datetime.now(timezone.utc),
@@ -51,11 +42,19 @@ def test_valid_login_creates_session(monkeypatch):
 def test_invalid_password_returns_error(monkeypatch):
     app = create_app("testing")
     monkeypatch.setattr(
-        auth_routes,
-        "_firebase_sign_in",
-        lambda email, password: (_ for _ in ()).throw(ValueError("Invalid email or password.")),
+        auth_routes.user_repository,
+        "get_user_by_email",
+        lambda email: UserModel(
+            id="uid-123",
+            firstName="Alice",
+            surname="Meyer",
+            email="alice@example.com",
+            passwordHash=generate_password_hash("StrongPass9"),
+            role="employee",
+            language="en",
+            createdAt=datetime.now(timezone.utc),
+        ),
     )
-    monkeypatch.setattr(auth_routes.firebase_config, "firebase_auth", object())
 
     with app.test_client() as client:
         response = client.post(
@@ -122,11 +121,19 @@ def test_rate_limiting_after_5_failures(monkeypatch):
     auth_routes.FAILED_LOGIN_ATTEMPTS.clear()
     app = create_app("testing")
     monkeypatch.setattr(
-        auth_routes,
-        "_firebase_sign_in",
-        lambda email, password: (_ for _ in ()).throw(ValueError("Invalid email or password.")),
+        auth_routes.user_repository,
+        "get_user_by_email",
+        lambda email: UserModel(
+            id="uid-123",
+            firstName="Alice",
+            surname="Meyer",
+            email="alice@example.com",
+            passwordHash=generate_password_hash("StrongPass9"),
+            role="employee",
+            language="en",
+            createdAt=datetime.now(timezone.utc),
+        ),
     )
-    monkeypatch.setattr(auth_routes.firebase_config, "firebase_auth", object())
 
     with app.test_client() as client:
         for _ in range(5):
@@ -148,13 +155,7 @@ def test_rate_limiting_after_5_failures(monkeypatch):
 
 
 def test_password_reset_sends_email(monkeypatch):
-    calls = {"link": 0, "email": 0, "audit": 0}
-
-    class _FakeAuth:
-        @staticmethod
-        def generate_password_reset_link(email):
-            calls["link"] += 1
-            return f"https://example.com/reset?email={email}"
+    calls = {"email": 0, "audit": 0}
 
     monkeypatch.setattr(
         auth_routes,
@@ -167,17 +168,15 @@ def test_password_reset_sends_email(monkeypatch):
         lambda *args, **kwargs: calls.__setitem__("audit", calls["audit"] + 1),
     )
     app = create_app("testing")
-    monkeypatch.setattr(auth_routes.firebase_config, "firebase_auth", _FakeAuth())
     with app.test_client() as client:
         response = client.post("/auth/forgot-password", json={"email": "alice@example.com"})
 
     assert response.status_code == 200
-    assert calls["link"] == 1
     assert calls["email"] == 1
     assert calls["audit"] == 1
 
 
-def test_account_settings_updates_firestore(monkeypatch):
+def test_account_settings_updates_database(monkeypatch):
     updated = {}
     app = create_app("testing")
     monkeypatch.setattr(
@@ -216,23 +215,15 @@ def test_account_settings_updates_firestore(monkeypatch):
     assert updated["data"] == {"firstName": "Alicia", "surname": "Meyer"}
 
 
-def test_language_change_persists_to_firestore(monkeypatch):
+def test_language_change_persists_to_database(monkeypatch):
     writes = {"saved": False}
 
-    class _FakeDocRef:
-        def set(self, payload, merge=False):
-            writes["saved"] = payload == {"language": "de"} and merge is True
-
-    class _FakeCollection:
-        def document(self, _uid):
-            return _FakeDocRef()
-
-    class _FakeDB:
-        def collection(self, _name):
-            return _FakeCollection()
-
     app = create_app("testing")
-    monkeypatch.setattr(auth_routes.firebase_config, "db", _FakeDB())
+    monkeypatch.setattr(
+        auth_routes.user_repository,
+        "update_user",
+        lambda uid, data: writes.__setitem__("saved", uid == "uid-123" and data == {"language": "de"}),
+    )
 
     with app.test_client() as client:
         with client.session_transaction() as flask_session:

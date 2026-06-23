@@ -17,44 +17,46 @@ CREATE TABLE IF NOT EXISTS receipts (
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     image_url TEXT NOT NULL,
     uploaded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    ocr_text TEXT NOT NULL DEFAULT '',
+    ocr_text TEXT DEFAULT '',
     ocr_confidence REAL,
-    merchant TEXT NOT NULL DEFAULT '',
-    address TEXT NOT NULL DEFAULT '',
-    receipt_date TEXT NOT NULL DEFAULT '',
-    currency TEXT NOT NULL DEFAULT '',
+    merchant TEXT DEFAULT '',
+    address TEXT DEFAULT '',
+    receipt_date TEXT DEFAULT '',
+    currency TEXT DEFAULT '',
     subtotal REAL,
     tax REAL,
     tip REAL,
     total REAL,
-    receipt_number TEXT NOT NULL DEFAULT '',
-    processing_status TEXT NOT NULL DEFAULT 'uploaded',
-    review_status TEXT NOT NULL DEFAULT 'draft',
-    error_message TEXT NOT NULL DEFAULT ''
+    receipt_number TEXT DEFAULT '',
+    processing_status TEXT DEFAULT 'uploaded',
+    review_status TEXT DEFAULT 'draft',
+    error_message TEXT DEFAULT '',
+    pdf_url TEXT DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS forms (
     id TEXT PRIMARY KEY,
     receipt_id TEXT NOT NULL UNIQUE REFERENCES receipts(id) ON DELETE RESTRICT,
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    form_type TEXT NOT NULL DEFAULT 'Hospitality Expense',
-    expense_category TEXT NOT NULL DEFAULT 'Other',
-    host TEXT NOT NULL DEFAULT '',
-    hosted_persons TEXT NOT NULL DEFAULT '[]',
-    occasion TEXT NOT NULL DEFAULT '',
+    form_type TEXT DEFAULT 'Hospitality Expense',
+    expense_category TEXT DEFAULT 'Other',
+    host TEXT DEFAULT '',
+    hosted_persons TEXT DEFAULT '[]',
+    occasion TEXT DEFAULT '',
     date_of_hospitality TEXT,
-    location_of_hospitality TEXT NOT NULL DEFAULT '',
+    location_of_hospitality TEXT DEFAULT '',
     invoice_amount REAL,
     tip REAL,
     total_amount REAL,
-    merchant TEXT NOT NULL DEFAULT '',
-    receipt_number TEXT NOT NULL DEFAULT '',
+    merchant TEXT DEFAULT '',
+    receipt_number TEXT DEFAULT '',
     form_date TEXT,
-    place TEXT NOT NULL DEFAULT '',
-    missing_fields TEXT NOT NULL DEFAULT '[]',
-    needs_manual_review INTEGER NOT NULL DEFAULT 0,
-    ai_confidence TEXT NOT NULL DEFAULT '{}',
-    status TEXT NOT NULL DEFAULT 'draft',
+    place TEXT DEFAULT '',
+    missing_fields TEXT DEFAULT '[]',
+    needs_manual_review INTEGER DEFAULT 0,
+    ai_confidence TEXT DEFAULT '{}',
+    status TEXT DEFAULT 'draft',
+    rejection_reason TEXT DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -70,8 +72,16 @@ CREATE TABLE IF NOT EXISTS combined_documents (
     email_sent INTEGER NOT NULL DEFAULT 0,
     email_sent_at TEXT,
     email_message_id TEXT,
-    email_delivery_status TEXT NOT NULL DEFAULT 'pending',
-    user_email TEXT NOT NULL DEFAULT ''
+    email_delivery_status TEXT DEFAULT 'pending',
+    email_error TEXT,
+    user_email TEXT DEFAULT '',
+    merchant TEXT DEFAULT '',
+    category TEXT DEFAULT 'Other',
+    host TEXT DEFAULT '',
+    occasion TEXT DEFAULT '',
+    total_amount REAL,
+    currency TEXT DEFAULT 'EUR',
+    status TEXT DEFAULT 'processing'
 );
 
 CREATE TABLE IF NOT EXISTS audit_logs (
@@ -82,7 +92,16 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     details TEXT NOT NULL DEFAULT '{}',
     ip_address TEXT NOT NULL DEFAULT '',
     user_agent TEXT NOT NULL DEFAULT '',
-    session_id TEXT NOT NULL DEFAULT ''
+    session_id TEXT NOT NULL DEFAULT '',
+    read_by TEXT NOT NULL DEFAULT '[]'
+);
+
+CREATE TABLE IF NOT EXISTS analytics_cache (
+    id TEXT PRIMARY KEY,
+    generated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    start_date TEXT NOT NULL DEFAULT '',
+    end_date TEXT NOT NULL DEFAULT '',
+    data TEXT NOT NULL DEFAULT '{}'
 );
 
 CREATE INDEX IF NOT EXISTS idx_receipts_user_id ON receipts(user_id);
