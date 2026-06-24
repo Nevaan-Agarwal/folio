@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from datetime import datetime
 from io import BytesIO
+import re
 
 from flask import Blueprint, g, jsonify, render_template, request, send_file, url_for
 
@@ -42,6 +43,33 @@ def _to_float(value) -> float:
         return float(value or 0)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _slugify_for_filename(value: str | None) -> str:
+    source = (value or "").strip().lower()
+    if not source:
+        return ""
+    normalized = re.sub(r"[^a-z0-9]+", "-", source)
+    normalized = normalized.strip("-")
+    return normalized[:80]
+
+
+def _pdf_download_filename(document) -> str:
+    merchant = ""
+    form_date = None
+    form_model = form_repository.get_form(document.formId)
+    if form_model is not None:
+        merchant = form_model.merchant or ""
+        form_date = _to_iso_date(form_model.date or form_model.dateOfHospitality)
+    slug = _slugify_for_filename(merchant)
+    date_part = form_date or _to_iso_date(document.createdAt) or ""
+    if slug and date_part:
+        return f"{slug}_{date_part}.pdf"
+    if slug:
+        return f"{slug}.pdf"
+    if date_part:
+        return f"receipt_{date_part}.pdf"
+    return f"{document.id}.pdf"
 
 
 def _extract_submission(doc) -> dict:
@@ -126,13 +154,16 @@ def _get_audit_timeline(document_id: str, form_id: str, receipt_id: str, user_id
 
 
 def _fetch_archive_page(
-    user_id: str, *, cursor: str | None = None, page_size: int = 200
+    user_id: str | None, *, cursor: str | None = None, page_size: int = 200
 ) -> tuple[list[dict], str | None, int]:
     if database_config.db is None:
         return [], None, 0
-    base_query = database_config.db.collection("combined_documents").where(
-        "userId", "==", user_id
-    )
+    if user_id:
+        base_query = database_config.db.collection("combined_documents").where(
+            "userId", "==", user_id
+        )
+    else:
+        base_query = database_config.db.collection("combined_documents")
     total_count = len(list(base_query.stream()))
     query = base_query.order_by("createdAt", direction="DESCENDING").limit(
         page_size
@@ -198,12 +229,14 @@ def archive_status():
 @require_auth
 def employee_archive():
     uid = g.user.get("uid")
+    is_admin = g.user.get("role") == "admin"
     page_size = min(max(int(request.args.get("limit", 200)), 1), 200)
     cursor = request.args.get("cursor")
     submissions, next_cursor, total = _fetch_archive_page(
-        uid, cursor=cursor, page_size=page_size
+        None if is_admin else uid, cursor=cursor, page_size=page_size
     )
-    submissions = [item for item in submissions if item.get("userId") == uid]
+    if not is_admin:
+        submissions = [item for item in submissions if item.get("userId") == uid]
     submissions = _apply_sort(_apply_filters(submissions, request.args), request.args.get("sort"))
     return render_template(
         "archive/employee_archive.html",
@@ -228,12 +261,14 @@ def employee_archive():
 @require_auth
 def employee_archive_data():
     uid = g.user.get("uid")
+    is_admin = g.user.get("role") == "admin"
     page_size = min(max(int(request.args.get("limit", 200)), 1), 200)
     cursor = request.args.get("cursor")
     submissions, next_cursor, total = _fetch_archive_page(
-        uid, cursor=cursor, page_size=page_size
+        None if is_admin else uid, cursor=cursor, page_size=page_size
     )
-    submissions = [item for item in submissions if item.get("userId") == uid]
+    if not is_admin:
+        submissions = [item for item in submissions if item.get("userId") == uid]
     submissions = _apply_sort(_apply_filters(submissions, request.args), request.args.get("sort"))
     return jsonify(
         {
@@ -305,9 +340,7 @@ def archive_document_pdf(document_id: str):
     except Exception:
         return jsonify({"success": False, "error": "PDF file unavailable"}), 404
 
-    filename = f"{document.id}.pdf"
-    if "/" in document.filePath:
-        filename = document.filePath.rsplit("/", 1)[-1] or filename
+    filename = _pdf_download_filename(document)
     as_attachment = request.args.get("download") in {"1", "true", "yes"}
     return send_file(
         BytesIO(pdf_bytes),

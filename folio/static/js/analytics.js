@@ -5,6 +5,7 @@
   const refreshBtn = document.getElementById("analyticsRefreshBtn");
   const downloadBtn = document.getElementById("analyticsDownloadBtn");
   if (!refreshBtn) return;
+  const i18n = window.__analyticsI18n || {};
 
   const palette = [
     "#F5A623",
@@ -22,7 +23,7 @@
   let employeesChart = null;
 
   function euro(value) {
-    return "EUR " + Number(value || 0).toFixed(2);
+    return (i18n.currencyCode || "EUR") + " " + Number(value || 0).toFixed(2);
   }
 
   function renderKpis(data) {
@@ -67,7 +68,7 @@
         labels: monthLabels,
         datasets: [
           {
-            label: "Spending",
+            label: i18n.spending || "Spending",
             data: monthValues,
             borderColor: "#F5A623",
             backgroundColor: "rgba(245, 166, 35, 0.1)",
@@ -101,7 +102,7 @@
       return Number(b.total || 0) - Number(a.total || 0);
     }).slice(0, 10);
     const employeeLabels = employeeEntries.map(function (entry) {
-      const name = entry.name || "Unknown";
+      const name = entry.name || (i18n.unknown || "Unknown");
       const parts = name.split(" ");
       const initials = parts.map(function (p) { return p[0] || ""; }).join("").slice(0, 2).toUpperCase();
       return initials + " " + name;

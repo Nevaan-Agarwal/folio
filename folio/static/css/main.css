@@ -1,22 +1,23 @@
 :root {
   --bg-primary: #0d1240;
-  --bg-surface: #124f94;
-  --bg-elevated: #002a69;
-  --border-default: #002a69;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f3f6ff;
+  --bg-accent-soft: #e9f0ff;
+  --border-default: #d2dbee;
   --border-hover: #124f94;
-  --accent-primary: #e07e00;
-  --accent-hover: #dd3d00;
-  --accent-muted: rgba(224, 126, 0, 0.12);
-  --text-primary: #f0ede8;
-  --text-secondary: #8a97b0;
-  --text-muted: #5a6a88;
+  --accent-primary: #0d1240;
+  --accent-hover: #002a69;
+  --accent-muted: rgba(13, 18, 64, 0.08);
+  --text-primary: #0d1240;
+  --text-secondary: #304472;
+  --text-muted: #5d6f98;
   --success: #2dd4a0;
   --success-muted: rgba(45, 212, 160, 0.12);
   --error: #dd3d00;
   --error-muted: rgba(221, 61, 0, 0.12);
   --warning: #e07e00;
-  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
-  --shadow-amber: 0 0 20px rgba(224, 126, 0, 0.2);
+  --shadow-card: 0 8px 24px rgba(8, 23, 64, 0.1);
+  --shadow-amber: 0 0 20px rgba(224, 126, 0, 0.18);
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
@@ -62,14 +63,28 @@ a {
 }
 
 .logo {
-  display: inline-block;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  text-align: center;
   font-family: var(--font-mono);
   font-weight: 700;
   font-size: 22px;
-  color: var(--accent-primary);
+  color: var(--bg-primary);
   letter-spacing: 0.02em;
   margin-bottom: 24px;
   text-shadow: var(--shadow-amber);
+}
+
+.logo-mark {
+  width: 100%;
+  max-width: 220px;
+  height: auto;
+  object-fit: contain;
+  border-radius: 6px;
 }
 
 .nav-list {
@@ -91,13 +106,13 @@ a {
 
 .nav-item:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-accent-soft);
 }
 
 .nav-item-active {
-  background: var(--accent-muted);
-  border-left-color: var(--accent-primary);
-  color: var(--accent-primary);
+  background: var(--bg-accent-soft);
+  border-left-color: var(--warning);
+  color: var(--bg-primary);
 }
 
 .nav-icon {
@@ -128,19 +143,20 @@ a {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  border: 1px solid var(--border-hover);
+  border: 1px solid var(--border-default);
   background: var(--bg-elevated);
   display: grid;
   place-items: center;
   font-family: var(--font-mono);
   font-size: 13px;
-  color: var(--accent-primary);
+  color: var(--bg-primary);
 }
 
 .user-name {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
+  color: var(--text-primary);
 }
 
 .logout-link {
@@ -211,7 +227,7 @@ a {
 
 .lang-pill-active {
   background: var(--accent-primary);
-  color: #0d1240;
+  color: #ffffff;
   font-weight: 600;
   border-color: transparent;
 }
@@ -219,6 +235,7 @@ a {
 .content-area {
   min-height: calc(100vh - 72px);
   padding: 32px;
+  background: var(--bg-primary);
 }
 
 .card {
@@ -243,13 +260,28 @@ button,
 
 .btn-primary {
   background: var(--accent-primary);
-  color: #0d1240;
+  color: #ffffff;
   font-weight: 600;
 }
 
 .btn-primary:hover {
   background: var(--accent-hover);
-  box-shadow: var(--shadow-amber);
+  box-shadow: 0 4px 16px rgba(13, 18, 64, 0.24);
+}
+
+/* Keep a few high-emphasis actions in yellow for visibility. */
+#approveBtn,
+.upload-submit,
+.camera-capture-btn {
+  background: var(--warning);
+  color: #0d1240;
+  border-color: transparent;
+}
+
+#approveBtn:hover,
+.upload-submit:hover,
+.camera-capture-btn:hover {
+  background: #c86f00;
 }
 
 .btn-secondary {
@@ -275,7 +307,7 @@ button,
 
 .input-field {
   width: 100%;
-  background: var(--bg-primary);
+  background: #ffffff;
   border: 1px solid var(--border-default);
   color: var(--text-primary);
   border-radius: var(--radius-md);
@@ -355,9 +387,36 @@ button,
   background: var(--error-muted);
 }
 
+.alert-error .alert-icon,
+.alert-error .alert-title,
+.alert-error .alert-message {
+  color: #ffffff;
+}
+
 .alert-success {
   border-color: rgba(45, 212, 160, 0.4);
   background: var(--success-muted);
+}
+
+.alert-success .alert-icon,
+.alert-success .alert-title {
+  color: #ffffff;
+}
+
+.alert-success .alert-message {
+  color: #ffffff;
+}
+
+.alert-success .alert-icon {
+  align-self: stretch;
+  width: 22px;
+  height: auto;
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  line-height: 1;
 }
 
 .alert-info {
@@ -536,6 +595,50 @@ button,
   stroke: var(--accent-primary);
   stroke-width: 2.2;
   opacity: 0.9;
+}
+
+.auth-brand-logo {
+  display: block;
+  width: min(440px, 100%);
+  height: auto;
+  margin: 0 0 8px;
+  object-fit: contain;
+}
+
+.login-brand-panel {
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 20px 18px 24px;
+}
+
+.login-brand-content {
+  width: 100%;
+  max-width: 440px;
+  margin-top: 0;
+  text-align: center;
+  --login-brand-offset: 127px;
+}
+
+.login-brand-content .auth-brand-logo {
+  margin: 0 auto 8px;
+  position: relative;
+  left: calc(50% + var(--login-brand-offset));
+  transform: translate(-50%, 15px);
+}
+
+.login-brand-content .register-logo {
+  margin: 0 auto;
+  text-align: center;
+  position: relative;
+  left: var(--login-brand-offset);
+}
+
+.login-brand-content .register-tagline {
+  margin-top: 6px;
+  margin-left: 0;
+  text-align: center;
+  position: relative;
+  left: var(--login-brand-offset);
 }
 
 .register-form-panel {
@@ -726,9 +829,10 @@ button,
 
 .upload-tab-active {
   background: var(--accent-primary);
-  color: #0d1240;
-  border-color: transparent;
+  color: #ffffff;
+  border-color: #ffffff;
   font-weight: 600;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45) inset;
 }
 
 .upload-pane {

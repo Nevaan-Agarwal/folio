@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t('nav.admin') }} - {{ t('app.name') }}{% endblock %}
+{% block page_title %}{{ t('nav.admin') }}{% endblock %}
+
+{% block head_extra %}
+<style>
+  .admin-home-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-bottom:14px; }
+  .admin-home-card { background:var(--bg-surface); border:1px solid var(--border-default); border-radius:var(--radius-xl); padding:16px; }
+  .admin-home-label { margin:0; color:var(--text-secondary); font-size:12px; text-transform:uppercase; letter-spacing:.08em; }
+  .admin-home-value { margin:8px 0 0; font-size:30px; font-weight:700; color:var(--accent-primary); }
+  .admin-actions { background:var(--bg-surface); border:1px solid var(--border-default); border-radius:var(--radius-xl); padding:16px; }
+  .admin-actions h3 { margin:0 0 10px; }
+  .admin-actions-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .admin-action-link { display:block; border:1px solid var(--border-default); border-radius:var(--radius-md); padding:12px; background:var(--bg-elevated); }
+  .admin-action-link strong { display:block; margin-bottom:4px; }
+  .admin-action-link span { color:var(--text-secondary); font-size:13px; }
+  .admin-action-link:hover { border-color:var(--accent-primary); }
+  @media (max-width: 1000px){ .admin-home-grid{grid-template-columns:1fr;} .admin-actions-grid{grid-template-columns:1fr;} }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="admin-home-grid">
+  <article class="admin-home-card">
+    <p class="admin-home-label">{{ t('admin.home.totalUsers') }}</p>
+    <p class="admin-home-value">{{ total_users }}</p>
+  </article>
+  <article class="admin-home-card">
+    <p class="admin-home-label">{{ t('admin.home.adminsEmployees') }}</p>
+    <p class="admin-home-value">{{ admin_count }} / {{ employee_count }}</p>
+  </article>
+  <article class="admin-home-card">
+    <p class="admin-home-label">{{ t('admin.home.totalSpend') }}</p>
+    <p class="admin-home-value">€ {{ '%.2f'|format(total_spend) }}</p>
+  </article>
+  <article class="admin-home-card">
+    <p class="admin-home-label">{{ t('admin.home.documents') }}</p>
+    <p class="admin-home-value">{{ total_documents }}</p>
+  </article>
+  <article class="admin-home-card">
+    <p class="admin-home-label">{{ t('admin.home.pendingReview') }}</p>
+    <p class="admin-home-value">{{ pending_reviews }}</p>
+  </article>
+</section>
+
+<section class="admin-actions">
+  <h3>{{ t('admin.home.adminTools') }}</h3>
+  <div class="admin-actions-grid">
+    <a class="admin-action-link" href="{{ url_for('admin.admin_archive') }}">
+      <strong>{{ t('admin.archive.title') }}</strong>
+      <span>{{ t('admin.home.companyArchiveHint') }}</span>
+    </a>
+    <a class="admin-action-link" href="{{ url_for('admin.admin_analytics') }}">
+      <strong>{{ t('admin.analytics.title') }}</strong>
+      <span>{{ t('admin.home.analyticsHint') }}</span>
+    </a>
+    <a class="admin-action-link" href="{{ url_for('admin.admin_users') }}">
+      <strong>{{ t('admin.users.title') }}</strong>
+      <span>{{ t('admin.home.userManagementHint') }}</span>
+    </a>
+  </div>
+</section>
+{% endblock %}

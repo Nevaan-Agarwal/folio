@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from flask import current_app, has_app_context
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from config import database as database_config
@@ -27,41 +28,139 @@ class EmailService:
     def _sanitize_filename(self, value: str) -> str:
         return "".join(ch if ch.isalnum() or ch in {"_", "-", "."} else "_" for ch in value)
 
-    def _build_subject(self, form_data: dict) -> str:
+    def _config_value(self, key: str, default: str = "") -> str:
+        if has_app_context():
+            configured = current_app.config.get(key)
+            if configured is not None:
+                return str(configured)
+        return os.getenv(key, default)
+
+    def _normalize_api_key(self, raw_key: str) -> str:
+        key = (raw_key or "").strip().strip('"').strip("'")
+        if key.lower().startswith("bearer "):
+            key = key[7:].strip()
+        return key
+
+    def _resolve_resend_config(self) -> tuple[str | None, str | None, str | None]:
+        api_key = self._normalize_api_key(self._config_value("RESEND_API_KEY", ""))
+        from_email = self._config_value("RESEND_FROM_EMAIL", "").strip()
+        if not api_key:
+            return None, None, "Resend authentication failed: RESEND_API_KEY is missing."
+        if not api_key.startswith("re_"):
+            return None, None, (
+                "Resend authentication failed: RESEND_API_KEY looks invalid. "
+                "Use the full key from Resend (usually starts with re_)."
+            )
+        if not from_email:
+            from_email = "Folio <onboarding@resend.dev>"
+        return api_key, from_email, None
+
+    def _is_sender_restriction_error(self, message: str | None) -> bool:
+        lowered = (message or "").lower()
+        sender_markers = (
+            "invalid `from`",
+            "from address",
+            "sender",
+            "domain is not verified",
+            "not verified",
+        )
+        return any(marker in lowered for marker in sender_markers)
+
+    def _perform_resend_request(self, api_key: str, payload: dict[str, Any]) -> tuple[str | None, str | None]:
+        req = urllib_request.Request(
+            "https://api.resend.com/emails",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib_request.urlopen(req, timeout=20) as response:
+                body = response.read().decode("utf-8")
+                decoded = json.loads(body or "{}")
+                return decoded.get("id"), None
+        except error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="ignore")
+            return None, f"Resend error: {exc.code} {body}"
+        except Exception as exc:
+            return None, str(exc)
+
+    def _render_inline_template(self, template: str, context: dict[str, Any]) -> str:
+        return self._jinja.from_string(template).render(**context).strip()
+
+    def _template_context(
+        self,
+        user_name: str,
+        form_data: dict,
+        pdf_download_url: str,
+        document_id: str,
+    ) -> dict[str, Any]:
+        merchant = form_data.get("merchant") or "-"
+        date = form_data.get("date") or form_data.get("dateOfHospitality") or "-"
+        category = form_data.get("expenseCategory") or "-"
+        total_value = float(form_data.get("totalAmount") or 0)
+        total_amount = f"EUR {total_value:.2f}"
+        employee_name = user_name or "User"
+        return {
+            "employee_name": employee_name,
+            "user_name": employee_name,  # backwards-compatible alias
+            "document_id": document_id,
+            "document_merchant": merchant,
+            "document_date": date,
+            "document_category": category,
+            "document_total": total_amount,
+            "pdf_download_url": pdf_download_url,
+            "support_email": self._config_value("SUPPORT_EMAIL", "support@folio.app"),
+        }
+
+    def _build_subject(self, form_data: dict, context: dict[str, Any]) -> str:
         merchant = form_data.get("merchant") or "Unknown Merchant"
         date = form_data.get("date") or form_data.get("dateOfHospitality") or "-"
         lang = form_data.get("language", "en")
+        custom_subject_template = self._config_value("FOLIO_EMAIL_SUBJECT_TEMPLATE", "").strip()
+        if custom_subject_template:
+            try:
+                return self._render_inline_template(custom_subject_template, context)
+            except Exception:
+                pass
         if lang == "de":
             return f"Ihr Folio Spesenbericht — {merchant} {date}"
         return f"Your Folio Expense Report — {merchant} {date}"
 
-    def _build_plain_text(self, user_name: str, form_data: dict, pdf_download_url: str) -> str:
-        merchant = form_data.get("merchant") or "-"
-        date = form_data.get("date") or form_data.get("dateOfHospitality") or "-"
-        category = form_data.get("expenseCategory") or "-"
-        total = form_data.get("totalAmount") or 0
+    def _build_plain_text(self, context: dict[str, Any]) -> str:
+        custom_text_template = self._config_value("FOLIO_EMAIL_TEXT_TEMPLATE", "").strip()
+        if custom_text_template:
+            try:
+                return self._render_inline_template(custom_text_template, context)
+            except Exception:
+                pass
         return (
-            f"Hello {user_name},\n\n"
+            f"Hello {context['employee_name']},\n\n"
             "Your Folio expense report is ready.\n"
-            f"Merchant: {merchant}\n"
-            f"Date: {date}\n"
-            f"Category: {category}\n"
-            f"Total Amount: EUR {float(total):.2f}\n\n"
-            f"Download PDF: {pdf_download_url}\n\n"
+            f"Merchant: {context['document_merchant']}\n"
+            f"Date: {context['document_date']}\n"
+            f"Category: {context['document_category']}\n"
+            f"Total Amount: {context['document_total']}\n\n"
+            f"Download PDF: {context['pdf_download_url']}\n\n"
             "This expense report was automatically generated by Folio.\n"
-            "Support: support@folio.app\n"
+            f"Support: {context['support_email']}\n"
         )
 
-    def _build_html(self, user_name: str, form_data: dict, pdf_download_url: str) -> str:
+    def _build_html(self, context: dict[str, Any]) -> str:
         template = self._jinja.get_template("emails/pdf_delivery.html")
         return template.render(
-            user_name=user_name,
-            merchant=form_data.get("merchant") or "-",
-            date=form_data.get("date") or form_data.get("dateOfHospitality") or "-",
-            category=form_data.get("expenseCategory") or "-",
-            total_amount=f"EUR {float(form_data.get('totalAmount') or 0):.2f}",
-            pdf_download_url=pdf_download_url,
-            support_email="support@folio.app",
+            **context,
+            intro_line=self._config_value(
+                "FOLIO_EMAIL_INTRO_TEMPLATE",
+                "Your expense report is ready. A PDF copy is attached and can also be downloaded below.",
+            ),
+            cta_label=self._config_value("FOLIO_EMAIL_CTA_LABEL", "Download PDF"),
+            footer_note=self._config_value(
+                "FOLIO_EMAIL_FOOTER_TEMPLATE",
+                "This expense report was automatically generated by Folio.",
+            ),
         )
 
     def _send_via_resend(
@@ -73,10 +172,9 @@ class EmailService:
         pdf_bytes: bytes,
         filename: str,
     ) -> tuple[str | None, str | None]:
-        api_key = os.getenv("RESEND_API_KEY", "")
-        from_email = os.getenv("RESEND_FROM_EMAIL", "Folio <onboarding@resend.dev>")
-        if not api_key:
-            raise RuntimeError("RESEND_API_KEY is missing")
+        api_key, from_email, config_error = self._resolve_resend_config()
+        if config_error:
+            return None, config_error
 
         payload = {
             "from": from_email,
@@ -91,26 +189,23 @@ class EmailService:
                 }
             ],
         }
-        req = urllib_request.Request(
-            "https://api.resend.com/emails",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
-        try:
-            with urllib_request.urlopen(req, timeout=20) as response:
-                body = response.read().decode("utf-8")
-                decoded = json.loads(body or "{}")
-                message_id = decoded.get("id")
-                return message_id, None
-        except error.HTTPError as exc:
-            body = exc.read().decode("utf-8", errors="ignore")
-            return None, f"Resend error: {exc.code} {body}"
-        except Exception as exc:
-            return None, str(exc)
+        message_id, send_error = self._perform_resend_request(api_key=api_key, payload=payload)
+        if message_id is not None:
+            return message_id, None
+
+        # Fallback for common local misconfiguration: unverified custom sender.
+        # Keep user's configured sender as primary, but degrade gracefully.
+        fallback_sender = "Folio <onboarding@resend.dev>"
+        lowered_error = (send_error or "").lower()
+        should_try_fallback_sender = self._is_sender_restriction_error(send_error) or "resend error: 403" in lowered_error
+        if should_try_fallback_sender and from_email != fallback_sender:
+            payload["from"] = fallback_sender
+            fallback_id, fallback_error = self._perform_resend_request(api_key=api_key, payload=payload)
+            if fallback_id is not None:
+                return fallback_id, None
+            return None, fallback_error
+
+        return None, send_error
 
     def _humanize_delivery_error(self, error_message: str | None) -> str:
         message = (error_message or "").strip()
@@ -125,7 +220,14 @@ class EmailService:
                 "Sender address is not allowed by Resend. "
                 "Set RESEND_FROM_EMAIL to a verified sender/domain."
             )
-        if "api key" in lowered or "unauthorized" in lowered or "403" in lowered:
+        if "resend authentication failed:" in lowered:
+            return message
+        if self._is_sender_restriction_error(message):
+            return (
+                "Sender address is not allowed by Resend. "
+                "Use a verified sender or keep RESEND_FROM_EMAIL empty to use onboarding@resend.dev."
+            )
+        if "api key" in lowered or "unauthorized" in lowered:
             return "Resend authentication failed. Check RESEND_API_KEY."
         return message or "Unknown delivery error."
 
@@ -138,9 +240,15 @@ class EmailService:
         pdf_bytes: bytes,
         document_id: str,
     ) -> dict[str, Any]:
-        subject = self._build_subject(form_data)
-        plain_text = self._build_plain_text(user_name, form_data, pdf_download_url)
-        html_content = self._build_html(user_name, form_data, pdf_download_url)
+        context = self._template_context(
+            user_name=user_name,
+            form_data=form_data,
+            pdf_download_url=pdf_download_url,
+            document_id=document_id,
+        )
+        subject = self._build_subject(form_data, context)
+        plain_text = self._build_plain_text(context)
+        html_content = self._build_html(context)
         filename = self._sanitize_filename(
             f"Folio_Expense_{form_data.get('merchant', 'merchant')}_{form_data.get('date') or form_data.get('dateOfHospitality') or 'date'}.pdf"
         )

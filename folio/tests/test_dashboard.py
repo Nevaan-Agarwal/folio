@@ -87,8 +87,9 @@ def test_dashboard_loads_for_employee(monkeypatch):
     body = response.get_data(as_text=True)
     assert response.status_code == 200
     assert "Good" in body
-    assert "Scan a Receipt" in body
+    assert "Recent Submissions" in body
     assert "Company Overview" not in body
+    assert "Welcome to Folio" in body
 
 
 def test_dashboard_loads_for_admin(monkeypatch):
@@ -101,6 +102,20 @@ def test_dashboard_loads_for_admin(monkeypatch):
     assert response.status_code == 200
     assert "Company Overview" in body
     assert "View Analytics" in body
+    assert "€ 327.50" in body
+
+
+def test_dashboard_hides_onboarding_after_completion(monkeypatch):
+    app = create_app("testing")
+    monkeypatch.setattr(database_config, "db", _FakeDB(_seed_data()))
+    with app.test_client() as client:
+        _session(client, "u1", "employee", "Alice")
+        with client.session_transaction() as flask_session:
+            flask_session["onboarding_completed"] = True
+        response = client.get("/dashboard")
+    body = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert 'id="onboardingBackdrop" hidden' in body
 
 
 def test_pending_review_banner_shows_correctly(monkeypatch):

@@ -120,34 +120,13 @@ def test_pdf_download_url_is_valid(monkeypatch):
     assert 'href="/archive/doc-1/pdf"' in body
 
 
-def test_resend_email_works(monkeypatch):
+def test_resend_email_disabled(monkeypatch):
     app = create_app("testing")
-    monkeypatch.setattr(
-        documents_routes.combined_document_repository,
-        "get_document",
-        lambda _doc_id: _doc(),
-    )
-    monkeypatch.setattr(documents_routes.form_repository, "get_form", lambda _fid: _form())
-    monkeypatch.setattr(
-        documents_routes.user_repository,
-        "get_user",
-        lambda _uid: type("User", (), {"firstName": "Alice", "surname": "Meyer", "email": "alice@example.com", "language": "en"})(),
-    )
-    monkeypatch.setattr(
-        documents_routes.database_config,
-        "bucket",
-        type("Bucket", (), {"blob": lambda self, path: type("Blob", (), {"download_as_bytes": lambda self: b"PDF"})()})(),
-    )
-    monkeypatch.setattr(
-        documents_routes.email_service,
-        "send_pdf_delivery",
-        lambda **_kwargs: {"success": True, "message_id": "m-1", "error": None},
-    )
     with app.test_client() as client:
         _session(client)
         response = client.post("/documents/doc-1/resend-email")
-    assert response.status_code == 200
-    assert response.get_json()["success"] is True
+    assert response.status_code == 410
+    assert response.get_json()["success"] is False
 
 
 def test_audit_timeline_shows_correct_events(monkeypatch):
@@ -251,3 +230,26 @@ def test_delete_submission_endpoint_forbidden_for_other_user(monkeypatch):
         _session(client, uid="user-1", role="employee")
         response = client.post("/documents/doc-1/delete")
     assert response.status_code == 403
+
+
+def test_pdf_download_uses_merchant_filename(monkeypatch):
+    app = create_app("testing")
+    monkeypatch.setattr(
+        archive_routes.combined_document_repository,
+        "get_document",
+        lambda _doc_id: _doc(),
+    )
+    monkeypatch.setattr(archive_routes.form_repository, "get_form", lambda _fid: _form())
+    monkeypatch.setattr(
+        archive_routes.database_config,
+        "bucket",
+        type("Bucket", (), {"blob": lambda self, path: type("Blob", (), {"download_as_bytes": lambda self: b"%PDF"})()})(),
+    )
+
+    with app.test_client() as client:
+        _session(client)
+        response = client.get("/archive/doc-1/pdf?download=1")
+
+    assert response.status_code == 200
+    content_disposition = response.headers.get("Content-Disposition", "")
+    assert "cafe-berlin_2026-06-17.pdf" in content_disposition

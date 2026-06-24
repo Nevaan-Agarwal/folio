@@ -1,41 +1,41 @@
 {% extends "base.html" %}
 
-{% block title %}Receipt Processing - {{ t('app.name') }}{% endblock %}
-{% block page_title %}Receipt Processing{% endblock %}
+{% block title %}{{ t('receipt.processingTitle') }} - {{ t('app.name') }}{% endblock %}
+{% block page_title %}{{ t('receipt.processingTitle') }}{% endblock %}
 
 {% block content %}
 <section class="card processing-card" data-receipt-id="{{ receipt.id }}" id="processingCard">
-  <h2>Processing Receipt</h2>
-  <p class="settings-note">We saved your receipt. OCR and AI extraction are running now.</p>
+  <h2>{{ t('receipt.processingReceipt') }}</h2>
+  <p class="settings-note">{{ t('receipt.processingSubtitle') }}</p>
 
   <ul class="processing-steps">
     <li class="processing-step processing-step-complete" data-step-index="1">
       <span class="processing-icon">✓</span>
-      <span>Receipt Saved</span>
+      <span>{{ t('receipt.stepReceiptSaved') }}</span>
     </li>
     <li class="processing-step processing-step-pending" data-step-index="2">
       <span class="processing-icon">2</span>
-      <span>Enhancing Image (OpenCV)</span>
+      <span>{{ t('receipt.stepEnhancingImage') }}</span>
     </li>
     <li class="processing-step processing-step-pending" data-step-index="3">
       <span class="processing-icon">3</span>
-      <span>Scanning Text (Tesseract OCR)</span>
+      <span>{{ t('receipt.stepScanningText') }}</span>
     </li>
     <li class="processing-step processing-step-pending" data-step-index="4">
       <span class="processing-icon">4</span>
-      <span>AI Processing</span>
+      <span>{{ t('receipt.stepAiProcessing') }}</span>
     </li>
     <li class="processing-step processing-step-pending" data-step-index="5">
       <span class="processing-icon">5</span>
-      <span>Ready to Review</span>
+      <span>{{ t('receipt.stepReadyToReview') }}</span>
     </li>
     <li class="processing-step processing-step-pending" data-step-index="6">
       <span class="processing-icon">6</span>
-      <span>PDF Generated</span>
+      <span>{{ t('receipt.stepPdfGenerated') }}</span>
     </li>
   </ul>
 
-  <p class="settings-note" id="processingStatusMessage">Starting pipeline...</p>
+  <p class="settings-note" id="processingStatusMessage">{{ t('receipt.startingPipeline') }}</p>
 
   <div class="confidence-wrap" id="confidenceWrap" hidden>
     <svg class="confidence-ring" viewBox="0 0 120 120">
@@ -44,21 +44,32 @@
     </svg>
     <div>
       <p class="confidence-value"><span id="confidenceValue">0</span>%</p>
-      <p class="settings-note" id="confidenceLabel">Processing...</p>
+      <p class="settings-note" id="confidenceLabel">{{ t('receipt.processing') }}</p>
     </div>
   </div>
 
   <div class="camera-denied" id="processingError" hidden>
-    <p class="camera-denied-title">Processing failed</p>
-    <p id="processingErrorMessage">OCR failed. Please retry.</p>
+    <p class="camera-denied-title">{{ t('receipt.processingFailed') }}</p>
+    <p id="processingErrorMessage">{{ t('errors.ocrFailed') }}</p>
     <div class="processing-error-actions">
-      <button class="btn-secondary" id="retryProcessingBtn" type="button">Try Again</button>
-      <a class="forgot-link" href="mailto:support@folio.local">Contact Support</a>
+      <button class="btn-secondary" id="retryProcessingBtn" type="button">{{ t('common.tryAgain') }}</button>
+      <a class="forgot-link" href="mailto:support@folio.local">{{ t('common.contactSupport') }}</a>
     </div>
   </div>
 </section>
 {% endblock %}
 
 {% block scripts %}
+<script>
+  window.__uploadI18n = {
+    processing: {
+      highConfidence: {{ t('receipt.highConfidence') | tojson }},
+      mediumConfidence: {{ t('receipt.mediumConfidence') | tojson }},
+      lowConfidence: {{ t('receipt.lowConfidence') | tojson }},
+      updateInProgress: {{ t('receipt.updateInProgress') | tojson }},
+      processingFailed: {{ t('receipt.processingFailed') | tojson }}
+    }
+  };
+</script>
 <script src="{{ url_for('static', filename='js/upload.js') }}"></script>
 {% endblock %}

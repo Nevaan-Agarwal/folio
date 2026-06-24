@@ -323,8 +323,11 @@ class AiService:
             elif de_match:
                 day, month, year = de_match.groups()
                 payload["date"] = f"{int(year):04d}-{int(month):02d}-{int(day):02d}"
-            if payload.get("tagDerBewirtung") is None:
-                payload["tagDerBewirtung"] = payload.get("date")
+        if payload.get("tagDerBewirtung") is None and payload.get("date") is not None:
+            payload["tagDerBewirtung"] = payload.get("date")
+
+        if payload.get("anlasDerBewirtung") is None and payload.get("suggestedDescription"):
+            payload["anlasDerBewirtung"] = str(payload.get("suggestedDescription"))[:120]
 
         if payload.get("receiptNumber") is None:
             match = re.search(
@@ -373,6 +376,14 @@ class AiService:
         if payload.get("ortDerBewirtung") is None:
             payload["ortDerBewirtung"] = payload.get("address")
 
+        if payload.get("ortDerBewirtung") is None:
+            city_match = re.search(
+                r"\b([A-ZÄÖÜ][a-zäöüß]+(?:\s+[A-ZÄÖÜ][a-zäöüß]+)*)\s+\d{4,5}\b",
+                text,
+            )
+            if city_match:
+                payload["ortDerBewirtung"] = city_match.group(1)
+
         if payload.get("suggestedDescription") is None:
             merchant = payload.get("merchant")
             total = payload.get("total")
@@ -386,6 +397,17 @@ class AiService:
             payload["expenseCategory"] = "Restaurant" if any(
                 token in lowered for token in ("restaurant", "cafe", "bewirtung", "gaststatte")
             ) else "Other"
+
+        if payload.get("subtotal") is None and payload.get("total") is not None:
+            # Keep subtotal usable for form draft even when receipt only exposes total.
+            payload["subtotal"] = payload.get("total")
+        if payload.get("total") is None and payload.get("subtotal") is not None:
+            payload["total"] = round(
+                float(payload.get("subtotal") or 0)
+                + float(payload.get("tax") or 0)
+                + float(payload.get("tip") or 0),
+                2,
+            )
 
         confidence = dict(payload.get("confidence") or {})
         if payload.get("total") is not None and confidence.get("total", 0) < 0.7:

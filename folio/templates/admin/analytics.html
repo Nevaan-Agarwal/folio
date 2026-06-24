@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}Admin Analytics - {{ t('app.name') }}{% endblock %}
-{% block page_title %}Admin Analytics{% endblock %}
+{% block title %}{{ t('admin.analytics.title') }} - {{ t('app.name') }}{% endblock %}
+{% block page_title %}{{ t('admin.analytics.title') }}{% endblock %}
 
 {% block head_extra %}
 <style>
@@ -32,44 +32,44 @@
 {% block content %}
 <section class="analytics-filter">
   <div class="analytics-quick">
-    <button class="quick-pill" type="button" data-range="this_month">This Month</button>
-    <button class="quick-pill" type="button" data-range="last_3_months">Last 3 Months</button>
-    <button class="quick-pill" type="button" data-range="this_year">This Year</button>
-    <button class="quick-pill" type="button" data-range="all_time">All Time</button>
+    <button class="quick-pill" type="button" data-range="this_month">{{ t('admin.analytics.thisMonth') }}</button>
+    <button class="quick-pill" type="button" data-range="last_3_months">{{ t('admin.analytics.last3Months') }}</button>
+    <button class="quick-pill" type="button" data-range="this_year">{{ t('admin.analytics.thisYear') }}</button>
+    <button class="quick-pill" type="button" data-range="all_time">{{ t('admin.analytics.allTime') }}</button>
   </div>
   <div class="analytics-filter-row">
     <input class="input-field" id="analyticsStartDate" type="date" value="{{ filters.start_date }}" />
     <input class="input-field" id="analyticsEndDate" type="date" value="{{ filters.end_date }}" />
-    <button id="analyticsRefreshBtn" class="btn-primary" type="button">Refresh</button>
-    <a id="analyticsDownloadBtn" class="btn-secondary" href="{{ url_for('admin.admin_analytics_export', start_date=filters.start_date, end_date=filters.end_date) }}">Download Report</a>
+    <button id="analyticsRefreshBtn" class="btn-primary" type="button">{{ t('common.refresh') }}</button>
+    <a id="analyticsDownloadBtn" class="btn-secondary" href="{{ url_for('admin.admin_analytics_export', start_date=filters.start_date, end_date=filters.end_date) }}">{{ t('admin.analytics.downloadReport') }}</a>
   </div>
 </section>
 
 <section class="analytics-kpis">
-  <article class="kpi-card"><p class="kpi-label">Total Spending</p><p id="kpiTotalSpending" class="kpi-value">EUR 0.00</p></article>
-  <article class="kpi-card"><p class="kpi-label">Submissions</p><p id="kpiSubmissions" class="kpi-value">0</p><p class="kpi-sub">this period</p></article>
-  <article class="kpi-card"><p class="kpi-label">Average Expense</p><p id="kpiAvgExpense" class="kpi-value">EUR 0.00</p></article>
-  <article class="kpi-card"><p class="kpi-label">Pending Review</p><p id="kpiPending" class="kpi-value kpi-pending-ok">0</p></article>
+  <article class="kpi-card"><p class="kpi-label">{{ t('admin.analytics.totalSpending') }}</p><p id="kpiTotalSpending" class="kpi-value">{{ t('common.currencyCode') }} 0.00</p></article>
+  <article class="kpi-card"><p class="kpi-label">{{ t('common.submissions') }}</p><p id="kpiSubmissions" class="kpi-value">0</p><p class="kpi-sub">{{ t('admin.analytics.thisPeriod') }}</p></article>
+  <article class="kpi-card"><p class="kpi-label">{{ t('admin.analytics.averageExpense') }}</p><p id="kpiAvgExpense" class="kpi-value">{{ t('common.currencyCode') }} 0.00</p></article>
+  <article class="kpi-card"><p class="kpi-label">{{ t('admin.analytics.pendingReview') }}</p><p id="kpiPending" class="kpi-value kpi-pending-ok">0</p></article>
 </section>
 
 <section class="chart-grid">
-  <article class="chart-card full"><h3 class="chart-title">Spending by Month</h3><canvas id="spendingByMonthChart" height="110"></canvas></article>
-  <article class="chart-card"><h3 class="chart-title">Spending by Category</h3><canvas id="spendingByCategoryChart" height="180"></canvas></article>
-  <article class="chart-card"><h3 class="chart-title">Top Employees by Spending</h3><canvas id="topEmployeesChart" height="180"></canvas></article>
+  <article class="chart-card full"><h3 class="chart-title">{{ t('admin.analytics.spendingByMonth') }}</h3><canvas id="spendingByMonthChart" height="110"></canvas></article>
+  <article class="chart-card"><h3 class="chart-title">{{ t('admin.analytics.spendingByCategory') }}</h3><canvas id="spendingByCategoryChart" height="180"></canvas></article>
+  <article class="chart-card"><h3 class="chart-title">{{ t('admin.analytics.topEmployeesBySpending') }}</h3><canvas id="topEmployeesChart" height="180"></canvas></article>
 </section>
 
 <section class="chart-grid">
   <article class="chart-card">
-    <h3 class="chart-title">Top Merchants</h3>
+    <h3 class="chart-title">{{ t('admin.analytics.topMerchants') }}</h3>
     <table class="analytics-table">
-      <thead><tr><th>#</th><th>Merchant</th><th>Total Spent</th><th>Submissions</th><th>Avg Amount</th></tr></thead>
+      <thead><tr><th>#</th><th>{{ t('common.merchant') }}</th><th>{{ t('admin.analytics.totalSpent') }}</th><th>{{ t('common.submissions') }}</th><th>{{ t('admin.analytics.avgAmount') }}</th></tr></thead>
       <tbody id="topMerchantsTableBody"></tbody>
     </table>
   </article>
   <article class="chart-card">
-    <h3 class="chart-title">Recent Activity</h3>
+    <h3 class="chart-title">{{ t('admin.analytics.recentActivity') }}</h3>
     <table class="analytics-table">
-      <thead><tr><th>Employee</th><th>Merchant</th><th>Amount</th><th>Category</th><th>Date</th><th>Status</th></tr></thead>
+      <thead><tr><th>{{ t('common.employee') }}</th><th>{{ t('common.merchant') }}</th><th>{{ t('common.amount') }}</th><th>{{ t('common.category') }}</th><th>{{ t('common.date') }}</th><th>{{ t('common.status') }}</th></tr></thead>
       <tbody id="recentActivityTableBody"></tbody>
     </table>
   </article>
@@ -80,6 +80,11 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   window.__analyticsInitial = {{ dashboard_data | tojson }};
+  window.__analyticsI18n = {
+    currencyCode: {{ t('common.currencyCode') | tojson }},
+    spending: {{ t('admin.analytics.spending') | tojson }},
+    unknown: {{ t('common.unknown') | tojson }}
+  };
 </script>
 <script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
 {% endblock %}

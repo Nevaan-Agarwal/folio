@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from config import database as database_config
 from repositories import form_repository, user_repository
@@ -19,11 +19,16 @@ class AnalyticsService:
         except (TypeError, ValueError):
             return 0.0
 
-    def _parse_iso(self, value: str | None) -> datetime | None:
+    def _parse_iso(self, value: str | datetime | None) -> datetime | None:
         if not value:
             return None
+        if isinstance(value, datetime):
+            return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        if isinstance(value, date):
+            return datetime(value.year, value.month, value.day, tzinfo=timezone.utc)
         try:
-            return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
         except ValueError:
             return None
 
@@ -53,14 +58,17 @@ class AnalyticsService:
     def _load_documents(self, start_date: str, end_date: str) -> list[dict]:
         if database_config.db is None:
             return []
-        query = (
-            database_config.db.collection("combined_documents")
-            .where("createdAt", ">=", f"{start_date}T00:00:00+00:00")
-            .where("createdAt", "<=", f"{end_date}T23:59:59+00:00")
-        )
+        start_dt = self._parse_iso(f"{start_date}T00:00:00+00:00")
+        end_dt = self._parse_iso(f"{end_date}T23:59:59+00:00")
+        query = database_config.db.collection("combined_documents")
         docs = []
         for doc in query.stream():
             payload = doc.to_dict() or {}
+            created_at = self._parse_iso(payload.get("createdAt"))
+            if start_dt and created_at and created_at < start_dt:
+                continue
+            if end_dt and created_at and created_at > end_dt:
+                continue
             payload["id"] = doc.id
             docs.append(payload)
         return docs
@@ -131,13 +139,14 @@ class AnalyticsService:
                 occasion_counts[occasion] += 1
                 total_hospitality += amount
 
+            created_dt = self._parse_iso(created_at)
             recent_activity.append(
                 {
                     "employee": employee_name,
                     "merchant": merchant,
                     "amount": amount,
                     "category": category,
-                    "date": created_at[:10] if created_at else "",
+                    "date": created_dt.date().isoformat() if created_dt else "",
                     "status": status or "processing",
                 }
             )

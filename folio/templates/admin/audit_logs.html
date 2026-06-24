@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}Audit Logs - {{ t('app.name') }}{% endblock %}
-{% block page_title %}Audit Logs{% endblock %}
+{% block title %}{{ t('admin.audit.title') }} - {{ t('app.name') }}{% endblock %}
+{% block page_title %}{{ t('admin.audit.title') }}{% endblock %}
 
 {% block head_extra %}
 <style>
@@ -19,24 +19,24 @@
 
 {% block content %}
 <form class="audit-filter" method="get" action="{{ url_for('admin.admin_audit_logs') }}">
-  <input class="input-field" type="text" name="user" value="{{ filters.user }}" placeholder="User name or ID" />
+  <input class="input-field" type="text" name="user" value="{{ filters.user }}" placeholder="{{ t('admin.audit.userPlaceholder') }}" />
   <select class="input-field" name="action">
-    <option value="">All Actions</option>
+    <option value="">{{ t('admin.audit.allActions') }}</option>
     {% for value in action_values %}
     <option value="{{ value }}" {% if filters.action == value %}selected{% endif %}>{{ value }}</option>
     {% endfor %}
   </select>
   <input class="input-field" type="date" name="date_from" value="{{ filters.date_from }}" />
   <input class="input-field" type="date" name="date_to" value="{{ filters.date_to }}" />
-  <button class="btn-primary" type="submit">Apply</button>
+  <button class="btn-primary" type="submit">{{ t('common.apply') }}</button>
 </form>
 
-<p class="audit-meta">{{ total_count }} log entries</p>
+<p class="audit-meta">{{ total_count }} {{ t('admin.audit.logEntries') }}</p>
 
 <div class="audit-table-wrap">
   <table class="audit-table">
     <thead>
-      <tr><th>Timestamp</th><th>User</th><th>Action</th><th>IP Address</th><th>Details</th></tr>
+      <tr><th>{{ t('admin.userDetail.timestamp') }}</th><th>{{ t('common.user') }}</th><th>{{ t('admin.userDetail.action') }}</th><th>{{ t('admin.audit.ipAddress') }}</th><th>{{ t('admin.audit.details') }}</th></tr>
     </thead>
     <tbody>
       {% for row in rows %}
@@ -49,7 +49,7 @@
       </tr>
       {% endfor %}
       {% if not rows %}
-      <tr><td colspan="5" style="text-align:center;color:var(--text-secondary);">No audit logs found.</td></tr>
+      <tr><td colspan="5" style="text-align:center;color:var(--text-secondary);">{{ t('admin.audit.noLogsFound') }}</td></tr>
       {% endif %}
     </tbody>
   </table>
@@ -57,10 +57,10 @@
 
 <div class="audit-pagination">
   {% if prev_url %}
-  <a class="btn-secondary" href="{{ prev_url }}">Previous</a>
+  <a class="btn-secondary" href="{{ prev_url }}">{{ t('common.previous') }}</a>
   {% endif %}
   {% if next_url %}
-  <a class="btn-secondary" href="{{ next_url }}">Next</a>
+  <a class="btn-secondary" href="{{ next_url }}">{{ t('common.next') }}</a>
   {% endif %}
 </div>
 {% endblock %}

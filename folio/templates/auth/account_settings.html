@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 
-{% block title %}Account Settings - {{ t('app.name') }}{% endblock %}
-{% block page_title %}Account Settings{% endblock %}
+{% block title %}{{ t('settings.title') }} - {{ t('app.name') }}{% endblock %}
+{% block page_title %}{{ t('settings.title') }}{% endblock %}
 
 {% block content %}
 <section class="settings-header">
   <div>
-    <h2 class="settings-title">Account Settings</h2>
-    <p class="settings-subtitle">Manage your profile, language, and security preferences.</p>
+    <h2 class="settings-title">{{ t('settings.title') }}</h2>
+    <p class="settings-subtitle">{{ t('settings.subtitle') }}</p>
   </div>
   <span class="settings-avatar">{{ initials }}</span>
 </section>
 
 <section class="settings-grid">
   <article class="card settings-card">
-    <p class="settings-section-label">Personal Information</p>
+    <p class="settings-section-label">{{ t('settings.personalInformation') }}</p>
     <form id="profileForm" class="form-grid" novalidate>
       <div class="field-group">
         <label for="firstName">{{ t('auth.firstName') }}</label>
@@ -27,46 +27,40 @@
         <p class="field-error" data-error-for="surname"></p>
       </div>
       <div class="field-group field-group-full">
-        <button class="btn-primary" type="submit">Save</button>
+        <button class="btn-primary" type="submit">{{ t('common.save') }}</button>
       </div>
     </form>
   </article>
 
   <article class="card settings-card">
-    <p class="settings-section-label">Language Preference</p>
-    <div class="language-switcher" role="group" aria-label="Language preference">
-      <button class="lang-pill {% if current_lang() == 'en' %}lang-pill-active{% endif %}" type="button" data-settings-lang="en">English</button>
-      <button class="lang-pill {% if current_lang() == 'de' %}lang-pill-active{% endif %}" type="button" data-settings-lang="de">German</button>
+    <p class="settings-section-label">{{ t('settings.languagePreference') }}</p>
+    <div class="language-switcher" role="group" aria-label="{{ t('settings.languagePreference') }}">
+      <button class="lang-pill {% if current_lang() == 'en' %}lang-pill-active{% endif %}" type="button" data-settings-lang="en">{{ t('settings.english') }}</button>
+      <button class="lang-pill {% if current_lang() == 'de' %}lang-pill-active{% endif %}" type="button" data-settings-lang="de">{{ t('settings.german') }}</button>
     </div>
-    <p class="settings-note">Language updates instantly and is saved to your profile.</p>
+    <p class="settings-note">{{ t('settings.languageUpdates') }}</p>
   </article>
 
   <article class="card settings-card">
-    <p class="settings-section-label">Account Information</p>
+    <p class="settings-section-label">{{ t('settings.accountInformation') }}</p>
     <dl class="settings-meta">
       <div>
-        <dt>Email Address</dt>
+        <dt>{{ t('auth.email') }}</dt>
         <dd>{{ user.email }}</dd>
       </div>
       <div>
-        <dt>Account Created</dt>
-        <dd>{{ user.createdAt.isoformat() if user.createdAt else 'Unknown' }}</dd>
+        <dt>{{ t('settings.accountCreated') }}</dt>
+        <dd>{{ user.createdAt.date().isoformat() if user.createdAt else t('common.unknown') }}</dd>
       </div>
       <div>
-        <dt>Role</dt>
+        <dt>{{ t('common.role') }}</dt>
         <dd>
-          <span class="badge-info">{{ 'Admin' if user.role == 'admin' else 'Employee' }}</span>
+          <span class="badge-info">{{ t('auth.adminRole') if user.role == 'admin' else t('auth.employeeRole') }}</span>
         </dd>
       </div>
     </dl>
   </article>
 
-  <article class="card settings-card">
-    <p class="settings-section-label">Security</p>
-    <p class="settings-note">Use password reset for secure password updates.</p>
-    <button class="btn-secondary" id="passwordResetBtn" type="button">Change Password</button>
-    <p class="field-error" data-error-for="security"></p>
-  </article>
 </section>
 
 <div class="toast-container" id="settingsToastContainer"></div>
@@ -76,7 +70,6 @@
 <script>
   (function () {
     const profileForm = document.getElementById("profileForm");
-    const passwordResetBtn = document.getElementById("passwordResetBtn");
     const toastContainer = document.getElementById("settingsToastContainer");
 
     function setError(field, message) {
@@ -140,7 +133,7 @@
           });
           return;
         }
-        showToast("Success", data.message || "Profile updated.");
+        showToast("{{ t('common.success') }}", data.message || "{{ t('settings.profileUpdated') }}");
       });
     }
 
@@ -157,26 +150,10 @@
           pill.classList.toggle("lang-pill-active", pill.getAttribute("data-settings-lang") === lang);
         });
         await applyTranslations(lang);
-        showToast("Success", "Language preference updated.");
+        showToast("{{ t('common.success') }}", "{{ t('settings.languageUpdated') }}");
       });
     });
 
-    if (passwordResetBtn) {
-      passwordResetBtn.addEventListener("click", async function () {
-        setError("security", "");
-        const response = await fetch("/auth/settings", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ action: "password_reset" }),
-        });
-        const data = await response.json();
-        if (!response.ok) {
-          setError("security", "Unable to send reset link.");
-          return;
-        }
-        showToast("Success", data.message || "A password reset link has been sent to your email");
-      });
-    }
   })();
 </script>
 {% endblock %}

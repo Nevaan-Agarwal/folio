@@ -85,6 +85,73 @@ def _to_form_model(form_id: str, data: dict | None) -> FormModel | None:
     )
 
 
+def _to_float(value):
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _first_non_empty(*values):
+    for value in values:
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        return value
+    return None
+
+
+def _normalize_ai_result_for_form(ai_result: dict) -> dict:
+    source = dict(ai_result or {})
+    subtotal = _to_float(_first_non_empty(source.get("subtotal"), source.get("invoiceAmount")))
+    tax = _to_float(source.get("tax"))
+    tip = _to_float(source.get("tip")) or 0.0
+    total = _to_float(source.get("total"))
+
+    if total is None and subtotal is not None:
+        total = round(float(subtotal) + float(tax or 0) + float(tip or 0), 2)
+    if subtotal is None and total is not None:
+        subtotal = round(float(total) - float(tax or 0) - float(tip or 0), 2)
+        if subtotal < 0:
+            subtotal = total
+
+    date_iso = _first_non_empty(source.get("date"), source.get("tagDerBewirtung"))
+    location = _first_non_empty(
+        source.get("ortDerBewirtung"),
+        source.get("locationOfHospitality"),
+        source.get("place"),
+        source.get("address"),
+    )
+    occasion = _first_non_empty(
+        source.get("anlasDerBewirtung"),
+        source.get("anlassDerBewirtung"),
+        source.get("occasion"),
+        source.get("suggestedDescription"),
+    )
+
+    normalized = {
+        "expenseCategory": _first_non_empty(source.get("expenseCategory"), "Other"),
+        "host": _first_non_empty(source.get("host"), ""),
+        "hostedPersons": source.get("hostedPersons")
+        if isinstance(source.get("hostedPersons"), list)
+        else [],
+        "occasion": occasion,
+        "dateOfHospitality": _first_non_empty(source.get("tagDerBewirtung"), date_iso),
+        "locationOfHospitality": location,
+        "invoiceAmount": subtotal,
+        "tip": tip if tip is not None else 0.0,
+        "totalAmount": total,
+        "merchant": _first_non_empty(source.get("merchant"), ""),
+        "receiptNumber": _first_non_empty(source.get("receiptNumber"), ""),
+        "date": date_iso,
+        "place": location,
+    }
+    return normalized
+
+
 def create_form_from_ai_result(
     receipt_id: str,
     user_id: str | dict | None = None,
@@ -97,28 +164,42 @@ def create_form_from_ai_result(
         user_id = receipt.userId if receipt is not None else ""
     ai_result = ai_result or {}
     user_id = str(user_id or "")
+    normalized = _normalize_ai_result_for_form(ai_result)
+    required_candidates = [
+        "merchant",
+        "dateOfHospitality",
+        "locationOfHospitality",
+        "occasion",
+        "invoiceAmount",
+        "totalAmount",
+    ]
+    missing_required = [
+        key
+        for key in required_candidates
+        if normalized.get(key) in (None, "", [])
+    ]
 
     now_iso = datetime.now(timezone.utc).isoformat()
     payload = {
         "receiptId": receipt_id,
         "userId": user_id,
         "type": "Hospitality Expense",
-        "expenseCategory": ai_result.get("expenseCategory"),
-        "host": "",
-        "hostedPersons": [],
-        "occasion": ai_result.get("anlasDerBewirtung"),
-        "dateOfHospitality": ai_result.get("tagDerBewirtung"),
-        "locationOfHospitality": ai_result.get("ortDerBewirtung"),
-        "invoiceAmount": ai_result.get("subtotal"),
-        "tip": ai_result.get("tip"),
-        "totalAmount": ai_result.get("total"),
-        "merchant": ai_result.get("merchant"),
-        "receiptNumber": ai_result.get("receiptNumber"),
-        "date": ai_result.get("date"),
-        "place": ai_result.get("ortDerBewirtung") or ai_result.get("address"),
-        "missingFields": ai_result.get("missingFields", []),
-        "needsManualReview": bool(ai_result.get("missingFields"))
-        or float((ai_result.get("confidence") or {}).get("overall") or 0) < 0.7,
+        "expenseCategory": normalized.get("expenseCategory"),
+        "host": normalized.get("host", ""),
+        "hostedPersons": normalized.get("hostedPersons", []),
+        "occasion": normalized.get("occasion"),
+        "dateOfHospitality": normalized.get("dateOfHospitality"),
+        "locationOfHospitality": normalized.get("locationOfHospitality"),
+        "invoiceAmount": normalized.get("invoiceAmount"),
+        "tip": normalized.get("tip"),
+        "totalAmount": normalized.get("totalAmount"),
+        "merchant": normalized.get("merchant"),
+        "receiptNumber": normalized.get("receiptNumber"),
+        "date": normalized.get("date"),
+        "place": normalized.get("place"),
+        "missingFields": missing_required,
+        "needsManualReview": len(missing_required) > 1
+        or float((ai_result.get("confidence") or {}).get("overall") or 0) < 0.55,
         "aiConfidence": ai_result.get("confidence", {}),
         "status": "draft",
         "createdAt": now_iso,

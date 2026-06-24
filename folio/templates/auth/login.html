@@ -5,15 +5,15 @@
 
 {% block auth_content %}
 <section class="register-layout">
-  <aside class="register-brand-panel">
-    <div class="register-brand-content">
+  <aside class="register-brand-panel login-brand-panel">
+    <div class="register-brand-content login-brand-content">
+      <img
+        class="auth-brand-logo"
+        src="{{ url_for('static', filename='images/company_logo.png') }}"
+        alt="{{ t('app.logoAlt') }}"
+      />
       <h1 class="register-logo">{{ t('app.name') }}</h1>
       <p class="register-tagline">{{ t('app.tagline') }}</p>
-      <svg class="receipt-illustration" viewBox="0 0 360 220" fill="none" aria-hidden="true">
-        <path d="M70 24h180l40 40v132l-20-8-20 8-20-8-20 8-20-8-20 8-20-8-20 8-20-8V24Z" />
-        <path d="M104 78h130M104 108h130M104 138h94" />
-        <path d="M224 152c18 0 32 14 32 32" />
-      </svg>
     </div>
   </aside>
 
@@ -39,9 +39,8 @@
         <div class="auth-login-actions">
           <label class="remember-me">
             <input type="checkbox" id="rememberMe" name="rememberMe" />
-            <span>Remember me</span>
+            <span>{{ t('auth.rememberMe') }}</span>
           </label>
-          <a class="forgot-link" href="{{ url_for('auth.forgot_password') }}">{{ t('auth.forgotPassword') }}</a>
         </div>
 
         <p class="field-error" data-error-for="form"></p>
@@ -52,7 +51,7 @@
       </form>
 
       <p class="auth-alt-link">
-        Don't have an account?
+        {{ t('auth.dontHaveAccount') }}
         <a href="{{ url_for('auth.register_page') }}">{{ t('auth.register') }}</a>
       </p>
     </div>
@@ -94,11 +93,11 @@
       };
 
       if (!payload.email) {
-        setError("email", "Email is required.");
+        setError("email", "{{ t('auth.emailRequired') }}");
         return;
       }
       if (!payload.password) {
-        setError("password", "Password is required.");
+        setError("password", "{{ t('auth.passwordRequired') }}");
         return;
       }
 
@@ -122,13 +121,13 @@
           } else if (data.error || data.message) {
             setError("form", data.error || data.message);
           } else {
-            setError("form", "Login failed. Please try again.");
+            setError("form", "{{ t('auth.loginFailed') }}");
           }
           return;
         }
         window.location.assign(data.redirect || "/auth/dashboard");
       } catch (error) {
-        setError("form", "Network error. Please try again.");
+        setError("form", "{{ t('common.networkError') }}");
       } finally {
         setLoadingState(false);
       }

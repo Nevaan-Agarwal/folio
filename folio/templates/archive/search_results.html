@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}Search Results - {{ t('app.name') }}{% endblock %}
-{% block page_title %}Search{% endblock %}
+{% block title %}{{ t('search.resultsTitle') }} - {{ t('app.name') }}{% endblock %}
+{% block page_title %}{{ t('search.pageTitle') }}{% endblock %}
 
 {% block head_extra %}
 <style>
@@ -59,12 +59,12 @@
 
 {% block content %}
 <section class="search-head">
-  <h2>Search Results</h2>
+  <h2>{{ t('search.resultsTitle') }}</h2>
   <p>
     {% if query %}
-      Showing {{ total }} result(s) for "<strong>{{ query }}</strong>"
+      {{ t('search.showingResultsFor') }} {{ total }} {{ t('search.resultsFor') }} "<strong>{{ query }}</strong>"
     {% else %}
-      Enter a term in the global search bar to find receipts and reports.
+      {{ t('search.enterTermHint') }}
     {% endif %}
   </p>
 </section>
@@ -73,7 +73,7 @@
 <section class="search-list">
   {% for item in results %}
   <article class="search-row">
-    <img class="search-thumb" src="{{ item.thumbnail }}" alt="receipt thumb" />
+    <img class="search-thumb" src="{{ item.thumbnail }}" alt="{{ t('common.receiptThumbnail') }}" />
     <div class="search-meta">
       <p class="merchant">{{ item.merchant }}</p>
       <p class="date">{{ item.date or '-' }}</p>
@@ -82,14 +82,14 @@
     <span class="search-amount">€ {{ "%.2f"|format(item.amount or 0) }}</span>
     <div style="display:flex; align-items:center; gap:10px;">
       <span class="search-status">{{ item.status }}</span>
-      <a class="search-view" href="{{ item.link }}">View →</a>
+      <a class="search-view" href="{{ item.link }}">{{ t('common.view') }} →</a>
     </div>
   </article>
   {% endfor %}
 </section>
 {% else %}
 <section class="search-empty">
-  <p style="margin:0;">No results found{% if query %} for "{{ query }}"{% endif %}.</p>
+  <p style="margin:0;">{{ t('search.noResultsFound') }}{% if query %} {{ t('search.resultsFor') }} "{{ query }}"{% endif %}.</p>
 </section>
 {% endif %}
 {% endblock %}

@@ -1,4 +1,5 @@
 (function () {
+  const notificationsI18n = (window.__folioI18n && window.__folioI18n.notifications) || {};
   const toastTypes = {
     success: { border: "var(--success)", icon: "✓" },
     error: { border: "var(--error)", icon: "✕" },
@@ -110,7 +111,7 @@
 
   function renderNotifications(items) {
     if (!Array.isArray(items) || items.length === 0) {
-      list.innerHTML = '<p class="notif-empty">No notifications yet.</p>';
+      list.innerHTML = '<p class="notif-empty">' + (notificationsI18n.empty || "No notifications yet.") + "</p>";
       return;
     }
     list.innerHTML = items

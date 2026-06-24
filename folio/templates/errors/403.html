@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}Access Forbidden - {{ t('app.name') }}{% endblock %}
-{% block page_title %}Access Restricted{% endblock %}
+{% block title %}{{ t('errors403.title') }} - {{ t('app.name') }}{% endblock %}
+{% block page_title %}{{ t('errors403.pageTitle') }}{% endblock %}
 
 {% block head_extra %}
 <style>
@@ -11,7 +11,7 @@
     text-align: center;
     border: 1px solid var(--border-default);
     border-radius: var(--radius-xl);
-    background: linear-gradient(180deg, var(--bg-elevated), var(--bg-primary));
+    background: var(--bg-surface);
     padding: 28px 24px;
   }
   .forbidden-code {
@@ -42,14 +42,13 @@
 {% block content %}
 <section class="card forbidden-wrap">
   <p class="forbidden-code">403</p>
-  <h2 class="forbidden-title">This page is restricted</h2>
+  <h2 class="forbidden-title">{{ t('errors403.heading') }}</h2>
   <p class="forbidden-text">
-    You do not currently have permission to view this admin area. If you need access,
-    contact your Folio administrator.
+    {{ t('errors403.message') }}
   </p>
   <div class="forbidden-actions">
-    <a class="btn-primary" href="{{ url_for('auth.dashboard') }}">Go to Dashboard</a>
-    <a class="btn-secondary" href="{{ url_for('archive.employee_archive') }}">View My Archive</a>
+    <a class="btn-primary" href="{{ url_for('auth.dashboard') }}">{{ t('errors403.goToDashboard') }}</a>
+    <a class="btn-secondary" href="{{ url_for('archive.employee_archive') }}">{{ t('errors403.viewMyArchive') }}</a>
   </div>
 </section>
 {% endblock %}

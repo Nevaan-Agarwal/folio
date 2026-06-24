@@ -1,21 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}User Detail - {{ t('app.name') }}{% endblock %}
-{% block page_title %}User Detail{% endblock %}
+{% block title %}{{ t('admin.userDetail.title') }} - {{ t('app.name') }}{% endblock %}
+{% block page_title %}{{ t('admin.userDetail.title') }}{% endblock %}
 
 {% block content %}
 <section class="card" style="margin-bottom:12px;">
   <h2 style="margin-top:0;">{{ user.firstName }} {{ user.surname }}</h2>
   <p class="settings-note" style="margin:0 0 6px;">{{ user.email }}</p>
-  <p class="settings-note" style="margin:0;">Role: {{ user.role }}{% if user.disabled %} • Disabled{% endif %}</p>
+  <p class="settings-note" style="margin:0;">{{ t('common.role') }}: {{ user.role }}{% if user.disabled %} • {{ t('admin.userDetail.disabled') }}{% endif %}</p>
 </section>
 
 <section class="card" style="margin-bottom:12px;">
-  <h3 style="margin-top:0;">Submissions</h3>
+  <h3 style="margin-top:0;">{{ t('common.submissions') }}</h3>
   <div class="table-wrap">
     <table class="table">
       <thead>
-        <tr><th>Document</th><th>Merchant</th><th>Category</th><th>Amount</th><th>Status</th><th>Date</th></tr>
+        <tr><th>{{ t('admin.userDetail.document') }}</th><th>{{ t('common.merchant') }}</th><th>{{ t('common.category') }}</th><th>{{ t('common.amount') }}</th><th>{{ t('common.status') }}</th><th>{{ t('common.date') }}</th></tr>
       </thead>
       <tbody>
         {% for item in submissions %}
@@ -25,11 +25,11 @@
           <td>{{ item.category }}</td>
           <td>€{{ '%.2f'|format(item.amount) }}</td>
           <td>{{ item.status }}</td>
-          <td>{{ item.createdAt[:10] if item.createdAt else '-' }}</td>
+          <td>{{ (item.createdAt.isoformat()[:10] if item.createdAt is not string else item.createdAt[:10]) if item.createdAt else '-' }}</td>
         </tr>
         {% endfor %}
         {% if not submissions %}
-        <tr><td colspan="6" style="text-align:center;color:var(--text-secondary);">No submissions found.</td></tr>
+        <tr><td colspan="6" style="text-align:center;color:var(--text-secondary);">{{ t('admin.userDetail.noSubmissions') }}</td></tr>
         {% endif %}
       </tbody>
     </table>
@@ -37,10 +37,10 @@
 </section>
 
 <section class="card">
-  <h3 style="margin-top:0;">Activity Log</h3>
+  <h3 style="margin-top:0;">{{ t('admin.userDetail.activityLog') }}</h3>
   <div class="table-wrap">
     <table class="table">
-      <thead><tr><th>Timestamp</th><th>Action</th><th>Performed By</th><th>Target User</th></tr></thead>
+      <thead><tr><th>{{ t('admin.userDetail.timestamp') }}</th><th>{{ t('admin.userDetail.action') }}</th><th>{{ t('admin.userDetail.performedBy') }}</th><th>{{ t('admin.userDetail.targetUser') }}</th></tr></thead>
       <tbody>
         {% for event in activity %}
         <tr>
@@ -51,7 +51,7 @@
         </tr>
         {% endfor %}
         {% if not activity %}
-        <tr><td colspan="4" style="text-align:center;color:var(--text-secondary);">No activity yet.</td></tr>
+        <tr><td colspan="4" style="text-align:center;color:var(--text-secondary);">{{ t('admin.userDetail.noActivity') }}</td></tr>
         {% endif %}
       </tbody>
     </table>

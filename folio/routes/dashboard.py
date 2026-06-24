@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from flask import Blueprint, g, render_template, url_for
+from flask import Blueprint, g, render_template, session, url_for
 
 from config import database as database_config
 from middleware.auth_middleware import require_auth
+from utils.helpers import get_current_language
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
@@ -50,12 +51,21 @@ def _current_month_start(now: datetime) -> datetime:
 
 def _get_greeting(name: str) -> str:
     hour = datetime.now().hour
-    if hour < 12:
-        part = "Good morning"
-    elif hour < 18:
-        part = "Good afternoon"
+    lang = get_current_language()
+    if lang == "de":
+        if hour < 12:
+            part = "Guten Morgen"
+        elif hour < 18:
+            part = "Guten Tag"
+        else:
+            part = "Guten Abend"
     else:
-        part = "Good evening"
+        if hour < 12:
+            part = "Good morning"
+        elif hour < 18:
+            part = "Good afternoon"
+        else:
+            part = "Good evening"
     return f"{part}, {name or 'there'}"
 
 
@@ -69,24 +79,30 @@ def _all_docs(collection_name: str) -> list[tuple[str, dict]]:
     return results
 
 
-def _build_user_dashboard(user_id: str) -> dict:
+def _build_user_dashboard(user_id: str | None) -> dict:
     now = datetime.now(timezone.utc)
     month_start = _current_month_start(now)
 
     receipt_rows = _all_docs("receipts")
-    user_receipts = {
-        receipt_id: payload for receipt_id, payload in receipt_rows if payload.get("userId") == user_id
-    }
+    user_receipts = {}
+    for receipt_id, payload in receipt_rows:
+        if user_id is not None and payload.get("userId") != user_id:
+            continue
+        user_receipts[receipt_id] = payload
 
     form_rows = _all_docs("forms")
-    user_forms = [payload for _form_id, payload in form_rows if payload.get("userId") == user_id]
+    user_forms = []
+    for _form_id, payload in form_rows:
+        if user_id is not None and payload.get("userId") != user_id:
+            continue
+        user_forms.append(payload)
 
     doc_rows = _all_docs("combined_documents")
-    user_docs = [
-        (doc_id, payload)
-        for doc_id, payload in doc_rows
-        if payload.get("userId") == user_id
-    ]
+    user_docs = []
+    for doc_id, payload in doc_rows:
+        if user_id is not None and payload.get("userId") != user_id:
+            continue
+        user_docs.append((doc_id, payload))
     user_docs.sort(key=lambda item: _to_datetime(item[1].get("createdAt")) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
 
     recent_submissions = []
@@ -179,8 +195,10 @@ def home():
     role = g.user.get("role", "employee")
     first_name = (g.user.get("name") or "there").strip()
 
-    user_data = _build_user_dashboard(user_id=user_id)
+    user_data = _build_user_dashboard(user_id=None if role == "admin" else user_id)
     admin_data = _build_admin_overview() if role == "admin" else {}
+
+    should_show_onboarding = not bool(session.get("onboarding_completed", False))
 
     return render_template(
         "dashboard/home.html",
@@ -193,4 +211,5 @@ def home():
         totalSpentThisMonth=user_data["totalSpentThisMonth"],
         isAdmin=role == "admin",
         adminOverview=admin_data,
+        showOnboarding=should_show_onboarding,
     )

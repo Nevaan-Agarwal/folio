@@ -23,24 +23,31 @@ def _to_user_model(uid: str, data: dict | None) -> UserModel | None:
         surname=data.get("surname", ""),
         email=data.get("email", ""),
         passwordHash=data.get("passwordHash", ""),
-        role=data.get("role", "employee"),
+        role=str(data.get("role", "")),
         language=data.get("language", "en"),
         disabled=bool(data.get("disabled", False)),
+        onboardingCompleted=bool(data.get("onboardingCompleted", False)),
         createdAt=created_at,
     )
 
 
 def create_user(
-    uid: str, first_name: str, surname: str, email: str, password_hash: str = ""
+    uid: str,
+    first_name: str,
+    surname: str,
+    email: str,
+    role: str,
+    password_hash: str = "",
 ) -> UserModel:
     payload = {
         "firstName": first_name,
         "surname": surname,
         "email": email,
         "passwordHash": password_hash,
-        "role": "employee",
+        "role": role,
         "language": "en",
         "disabled": False,
+        "onboardingCompleted": False,
         "createdAt": datetime.now(timezone.utc).isoformat(),
     }
     database_config.db.collection("users").document(uid).set(payload)

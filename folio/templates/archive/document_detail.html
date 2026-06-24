@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}Document Detail - {{ t('app.name') }}{% endblock %}
-{% block page_title %}Document Detail{% endblock %}
+{% block title %}{{ t('archive.documentDetail') }} - {{ t('app.name') }}{% endblock %}
+{% block page_title %}{{ t('archive.documentDetail') }}{% endblock %}
 
 {% block head_extra %}
 <style>
@@ -23,12 +23,7 @@
   .timeline-action { margin:0; color:var(--text-primary); font-size:13px; }
   .doc-info-mono { font-family:var(--font-mono); color:var(--text-muted); font-size:12px; }
   .doc-actions-stack { display:grid; gap:8px; margin-top:10px; }
-  .email-badge { display:inline-flex; padding:6px 10px; border-radius:999px; font-size:12px; border:1px solid transparent; }
-  .email-sent { color:var(--success); background:var(--success-muted); border-color:rgba(45,212,160,.35); }
-  .email-failed { color:var(--error); background:var(--error-muted); border-color:rgba(255,92,92,.35); }
-  .email-pending { color:var(--warning); background:var(--accent-muted); border-color:rgba(245,166,35,.35); }
   .doc-delete-link { background:none; border:0; color:var(--error); padding:0; margin-top:12px; font-size:13px; cursor:pointer; }
-  .resend-loading { opacity:.7; pointer-events:none; }
   @keyframes pulse-dot { 0%{box-shadow:0 0 0 0 rgba(245,166,35,.55);} 70%{box-shadow:0 0 0 10px rgba(245,166,35,0);} 100%{box-shadow:0 0 0 0 rgba(245,166,35,0);} }
   @media (max-width: 1100px) { .doc-layout { grid-template-columns:1fr; } }
 </style>
@@ -36,12 +31,12 @@
 
 {% block content %}
 <p class="doc-breadcrumb">
-  <a href="{{ url_for('archive.employee_archive') }}">Archive</a> → {{ form.merchant or receipt.merchant }} {{ form.date or form.dateOfHospitality or '' }}
+  <a href="{{ url_for('archive.employee_archive') }}">{{ t('nav.archive') }}</a> → {{ form.merchant or receipt.merchant }} {{ form.date or form.dateOfHospitality or '' }}
 </p>
 
 <section class="doc-layout">
   <article class="card">
-    <img class="doc-receipt-img" src="{{ url_for('receipts.receipt_image', receipt_id=receipt.id) }}" alt="Original receipt" />
+    <img class="doc-receipt-img" src="{{ url_for('receipts.receipt_image', receipt_id=receipt.id) }}" alt="{{ t('archive.originalReceipt') }}" />
     <div class="confidence-wrap" style="margin-top:10px;">
       <svg class="confidence-ring" viewBox="0 0 120 120">
         <circle class="confidence-ring-bg" cx="60" cy="60" r="52"></circle>
@@ -49,46 +44,46 @@
       </svg>
       <div>
         <p class="confidence-value">{{ (receipt.ocrConfidence or 0)|round|int }}%</p>
-        <p class="settings-note">OCR Confidence</p>
+        <p class="settings-note">{{ t('archive.ocrConfidence') }}</p>
       </div>
     </div>
-    <button type="button" id="toggleOcrText" class="btn-secondary doc-ocr-toggle">View OCR Text ▾</button>
+    <button type="button" id="toggleOcrText" class="btn-secondary doc-ocr-toggle">{{ t('archive.viewOcrText') }} ▾</button>
     <pre id="ocrTextBlock" class="doc-ocr-text" hidden>{{ receipt.ocrText }}</pre>
-    <p class="settings-note" style="margin-top:8px;">Uploaded: {{ receipt.uploadedAt or '-' }}</p>
+    <p class="settings-note" style="margin-top:8px;">{{ t('archive.uploaded') }}: {{ receipt.uploadedAt or '-' }}</p>
   </article>
 
   <article class="card">
-    <div class="section-header"><p>Basic Information</p></div>
+    <div class="section-header"><p>{{ t('archive.basicInformation') }}</p></div>
     <div class="doc-fields-grid doc-section">
-      <div><p class="doc-label">Type</p><p class="doc-value">{{ form.type or '-' }}</p></div>
-      <div><p class="doc-label">Category</p><p class="doc-value">{{ form.expenseCategory or '-' }}</p></div>
-      <div><p class="doc-label">Receipt Number</p><p class="doc-value">{{ form.receiptNumber or '-' }}</p></div>
-      <div><p class="doc-label">Merchant</p><p class="doc-value">{{ form.merchant or receipt.merchant or '-' }}</p></div>
+      <div><p class="doc-label">{{ t('archive.type') }}</p><p class="doc-value">{{ form.type or '-' }}</p></div>
+      <div><p class="doc-label">{{ t('archive.category') }}</p><p class="doc-value">{{ form.expenseCategory or '-' }}</p></div>
+      <div><p class="doc-label">{{ t('archive.receiptNumber') }}</p><p class="doc-value">{{ form.receiptNumber or '-' }}</p></div>
+      <div><p class="doc-label">{{ t('form.merchant') }}</p><p class="doc-value">{{ form.merchant or receipt.merchant or '-' }}</p></div>
     </div>
 
-    <div class="section-header"><p>Bewirtungsdetails / Hospitality Details</p></div>
+    <div class="section-header"><p>{{ t('archive.hospitalityDetails') }}</p></div>
     <div class="doc-fields-grid doc-section">
-      <div><p class="doc-label">Tag der Bewirtung / Date</p><p class="doc-value">{{ form.dateOfHospitality or '-' }}</p></div>
-      <div><p class="doc-label">Ort der Bewirtung / Location</p><p class="doc-value">{{ form.locationOfHospitality or '-' }}</p></div>
-      <div><p class="doc-label">Bewirtende Person / Host</p><p class="doc-value">{{ form.host or '-' }}</p></div>
-      <div><p class="doc-label">Anlass der Bewirtung / Occasion</p><p class="doc-value">{{ form.occasion or '-' }}</p></div>
+      <div><p class="doc-label">{{ t('form.date') }}</p><p class="doc-value">{{ form.dateOfHospitality or '-' }}</p></div>
+      <div><p class="doc-label">{{ t('form.location') }}</p><p class="doc-value">{{ form.locationOfHospitality or '-' }}</p></div>
+      <div><p class="doc-label">{{ t('form.host') }}</p><p class="doc-value">{{ form.host or '-' }}</p></div>
+      <div><p class="doc-label">{{ t('form.occasion') }}</p><p class="doc-value">{{ form.occasion or '-' }}</p></div>
     </div>
     <div class="doc-section">
-      <p class="doc-label">Bewirtete Personen / Guests</p>
+      <p class="doc-label">{{ t('form.guests') }}</p>
       <p class="doc-value">{{ (form.hostedPersons or [])|join(', ') or '-' }}</p>
     </div>
 
-    <div class="section-header"><p>Financial</p></div>
+    <div class="section-header"><p>{{ t('archive.financial') }}</p></div>
     <div class="doc-fields-grid doc-section">
-      <div><p class="doc-label">Invoice Amount</p><p class="doc-value">EUR {{ "%.2f"|format(form.invoiceAmount or 0) }}</p></div>
-      <div><p class="doc-label">Tip</p><p class="doc-value">EUR {{ "%.2f"|format(form.tip or 0) }}</p></div>
-      <div><p class="doc-label">Total Amount</p><p class="doc-value">EUR {{ "%.2f"|format(form.totalAmount or 0) }}</p></div>
-      <div><p class="doc-label">Place</p><p class="doc-value">{{ form.place or '-' }}</p></div>
+      <div><p class="doc-label">{{ t('archive.invoiceAmount') }}</p><p class="doc-value">EUR {{ "%.2f"|format(form.invoiceAmount or 0) }}</p></div>
+      <div><p class="doc-label">{{ t('form.tip') }}</p><p class="doc-value">EUR {{ "%.2f"|format(form.tip or 0) }}</p></div>
+      <div><p class="doc-label">{{ t('archive.totalAmount') }}</p><p class="doc-value">EUR {{ "%.2f"|format(form.totalAmount or 0) }}</p></div>
+      <div><p class="doc-label">{{ t('archive.place') }}</p><p class="doc-value">{{ form.place or '-' }}</p></div>
     </div>
   </article>
 
   <aside class="doc-actions-card">
-    <p class="doc-label">Status Timeline</p>
+    <p class="doc-label">{{ t('archive.statusTimeline') }}</p>
     <ul class="timeline">
       {% for item in timeline %}
       <li class="timeline-item">
@@ -100,38 +95,21 @@
       </li>
       {% endfor %}
       {% if not timeline %}
-      <li class="timeline-item"><span class="timeline-dot current"></span><p class="timeline-action">No audit events</p></li>
+      <li class="timeline-item"><span class="timeline-dot current"></span><p class="timeline-action">{{ t('archive.noAuditEvents') }}</p></li>
       {% endif %}
     </ul>
 
-    <p class="doc-label" style="margin-top:14px;">Document Info</p>
+    <p class="doc-label" style="margin-top:14px;">{{ t('archive.documentInfo') }}</p>
     <p class="doc-info-mono">{{ document.id }}</p>
-    <p class="settings-note">Created: {{ document.createdAt or '-' }}</p>
+    <p class="settings-note">{{ t('archive.created') }}: {{ document.createdAt or '-' }}</p>
 
     <div class="doc-actions-stack">
-      <a class="btn-primary" href="{{ documentPdfUrl }}?download=1">Download PDF</a>
-      <a class="btn-secondary" href="{{ documentPdfUrl }}" target="_blank" rel="noopener">Preview PDF</a>
+      <a class="btn-primary" href="{{ documentPdfUrl }}?download=1">{{ t('archive.downloadPdf') }}</a>
+      <a class="btn-secondary" href="{{ documentPdfUrl }}" target="_blank" rel="noopener">{{ t('archive.previewPdf') }}</a>
     </div>
 
-    <p class="doc-label" style="margin-top:14px;">Email Delivery Status</p>
-    {% if document.emailDeliveryStatus == "sent" %}
-    <span class="email-badge email-sent">Sent to {{ document.userEmail or 'user email' }}</span>
-    <p class="settings-note">Sent at {{ document.emailSentAt or '-' }}</p>
-    {% elif document.emailDeliveryStatus == "failed" %}
-    <span class="email-badge email-failed">Delivery failed</span>
-    {% if document.emailError %}
-    <p class="settings-note" style="margin-top:6px;">{{ document.emailError }}</p>
-    {% endif %}
-    {% else %}
-    <span class="email-badge email-pending">Delivery pending...</span>
-    {% endif %}
-
-    {% if document.emailSent or document.emailDeliveryStatus == "failed" %}
-    <button id="resendEmailBtn" type="button" class="btn-danger" style="width:100%; margin-top:8px;">Resend Email</button>
-    {% endif %}
-
     {% if can_delete %}
-    <button id="deleteSubmissionBtn" type="button" class="doc-delete-link">Delete Submission</button>
+    <button id="deleteSubmissionBtn" type="button" class="doc-delete-link">{{ t('archive.deleteSubmission') }}</button>
     {% endif %}
   </aside>
 </section>
@@ -145,39 +123,17 @@
     if (toggle && ocr) {
       toggle.addEventListener("click", function () {
         ocr.hidden = !ocr.hidden;
-        toggle.textContent = ocr.hidden ? "View OCR Text ▾" : "View OCR Text ▴";
-      });
-    }
-
-    const resendBtn = document.getElementById("resendEmailBtn");
-    if (resendBtn) {
-      resendBtn.addEventListener("click", async function () {
-        resendBtn.classList.add("resend-loading");
-        resendBtn.textContent = "Sending...";
-        try {
-          const response = await fetch("/documents/{{ document.id }}/resend-email", { method: "POST", headers: { Accept: "application/json" } });
-          if (response.ok) {
-            window.location.reload();
-          } else {
-            const payload = await response.json().catch(function () { return {}; });
-            window.alert(payload.error || "Resend failed.");
-            resendBtn.textContent = "Resend Email";
-            resendBtn.classList.remove("resend-loading");
-          }
-        } catch (_error) {
-          resendBtn.textContent = "Resend Email";
-          resendBtn.classList.remove("resend-loading");
-        }
+        toggle.textContent = ocr.hidden ? "{{ t('archive.viewOcrText') }} ▾" : "{{ t('archive.viewOcrText') }} ▴";
       });
     }
 
     const deleteBtn = document.getElementById("deleteSubmissionBtn");
     if (deleteBtn) {
       deleteBtn.addEventListener("click", async function () {
-        const confirmed = window.confirm("Delete this submission permanently? This action cannot be undone.");
+        const confirmed = window.confirm("{{ t('archive.deleteConfirm') }}");
         if (!confirmed) return;
         deleteBtn.disabled = true;
-        deleteBtn.textContent = "Deleting...";
+        deleteBtn.textContent = "{{ t('archive.deleting') }}";
         try {
           const response = await fetch("/documents/{{ document.id }}/delete", {
             method: "POST",
@@ -185,16 +141,24 @@
           });
           const payload = await response.json().catch(function () { return {}; });
           if (!response.ok || !payload.success) {
-            window.alert(payload.error || "Delete failed.");
+            if (window.showToast) {
+              window.showToast(payload.error || "{{ t('app.name') }}: {{ t('archive.deleteFailed') }}", "error");
+            } else {
+              window.alert(payload.error || "{{ t('archive.deleteFailed') }}");
+            }
             deleteBtn.disabled = false;
-            deleteBtn.textContent = "Delete Submission";
+            deleteBtn.textContent = "{{ t('archive.deleteSubmission') }}";
             return;
           }
           window.location.href = "/archive";
         } catch (_error) {
           deleteBtn.disabled = false;
-          deleteBtn.textContent = "Delete Submission";
-          window.alert("Delete failed.");
+          deleteBtn.textContent = "{{ t('archive.deleteSubmission') }}";
+          if (window.showToast) {
+            window.showToast("{{ t('app.name') }}: {{ t('archive.deleteFailed') }}", "error");
+          } else {
+            window.alert("{{ t('archive.deleteFailed') }}");
+          }
         }
       });
     }

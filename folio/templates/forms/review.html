@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}Form Review - {{ t('app.name') }}{% endblock %}
-{% block page_title %}Hospitality Expense Form Review{% endblock %}
+{% block title %}{{ t('form.reviewTitle') }} - {{ t('app.name') }}{% endblock %}
+{% block page_title %}{{ t('form.reviewTitle') }}{% endblock %}
 
 {% block head_extra %}
 <style>
@@ -32,11 +32,6 @@
   .status-pending_review { background:var(--accent-muted); color:var(--warning); border-color:var(--warning); }
   .status-approved { background:var(--success-muted); color:var(--success); border-color:var(--success); }
   .status-rejected { background:var(--error-muted); color:var(--error); border-color:var(--error); }
-  .email-status { display:flex; align-items:center; gap:8px; margin:10px 0 4px; font-size:13px; }
-  .email-icon { font-size:14px; }
-  .email-status.sent { color:var(--success); }
-  .email-status.pending { color:var(--warning); }
-  .email-status.failed { color:var(--error); }
   @media (max-width: 1024px){ .form-review-layout{ grid-template-columns:1fr; } }
 </style>
 {% endblock %}
@@ -45,9 +40,9 @@
 <section class="form-review-layout" data-form-id="{{ form.id }}" data-receipt-id="{{ form.receiptId }}" data-read-only="{{ 'true' if form.isReadOnly else 'false' }}">
   <aside class="card">
     <div class="receipt-thumb-wrap">
-      <img class="receipt-thumb" src="{{ url_for('receipts.receipt_image', receipt_id=receipt.id) if receipt else '' }}" alt="Receipt preview" />
+      <img class="receipt-thumb" src="{{ url_for('receipts.receipt_image', receipt_id=receipt.id) if receipt else '' }}" alt="{{ t('receipt.receiptPreview') }}" />
     </div>
-    <p class="ocr-label">Original Receipt</p>
+    <p class="ocr-label">{{ t('archive.originalReceipt') }}</p>
 
     <div class="confidence-wrap">
       <svg class="confidence-ring" viewBox="0 0 120 120">
@@ -55,31 +50,31 @@
         <circle class="confidence-ring-fill" id="reviewConfidenceRing" cx="60" cy="60" r="52"></circle>
       </svg>
       <div>
-        <p class="confidence-value"><span id="reviewConfidenceValue">{{ receipt.ocrConfidence or 0 }}</span>% confidence</p>
-        <p class="settings-note" id="reviewConfidenceLabel">Medium quality scan</p>
+        <p class="confidence-value"><span id="reviewConfidenceValue">{{ receipt.ocrConfidence or 0 }}</span>% {{ t('receipt.confidence') }}</p>
+        <p class="settings-note" id="reviewConfidenceLabel">{{ t('receipt.mediumConfidence') }}</p>
       </div>
     </div>
 
     <div class="field-row">
-      <button class="btn-secondary ocr-toggle" type="button" id="ocrToggleBtn">View extracted text ▾</button>
+      <button class="btn-secondary ocr-toggle" type="button" id="ocrToggleBtn">{{ t('form.viewExtractedTextDown') }}</button>
       <pre class="ocr-raw" id="ocrRawBlock" hidden>{{ receipt.ocrText if receipt else '' }}</pre>
     </div>
   </aside>
 
   <section class="card">
     <div class="form-panel-header">
-      <h2 style="margin:0;">Form Editor</h2>
+      <h2 style="margin:0;">{{ t('form.editor') }}</h2>
       <span class="status-pill status-{{ form.status }}">{{ form.status.replace('_', ' ')|title }}</span>
     </div>
     <form id="reviewForm" novalidate>
-      <div class="section-header"><p>Basic Information</p></div>
+      <div class="section-header"><p>{{ t('form.basicInformation') }}</p></div>
       <div class="split-two">
         <div class="field-row" data-field="type">
-          <div class="field-label-line"><label>Type</label></div>
+          <div class="field-label-line"><label>{{ t('archive.type') }}</label></div>
           <input class="input-field" name="type" value="{{ form.type or '' }}" {% if form.isReadOnly %}disabled{% endif %} />
         </div>
         <div class="field-row" data-field="expenseCategory">
-          <div class="field-label-line"><label>Expense Category</label></div>
+          <div class="field-label-line"><label>{{ t('form.expenseCategory') }}</label></div>
           <select class="input-field" name="expenseCategory" {% if form.isReadOnly %}disabled{% endif %}>
             {% for category in ['Restaurant','Business Meal','Client Meeting','Travel','Hotel','Transportation','Office Supplies','Entertainment','Training/Workshop','Other'] %}
             <option value="{{ category }}" {% if form.expenseCategory == category %}selected{% endif %}>{{ category }}</option>
@@ -88,109 +83,97 @@
         </div>
       </div>
       <div class="field-row" data-field="receiptNumber">
-        <div class="field-label-line"><label>Receipt Number</label></div>
+        <div class="field-label-line"><label>{{ t('archive.receiptNumber') }}</label></div>
         <input class="input-field" name="receiptNumber" value="{{ form.receiptNumber or '' }}" {% if form.isReadOnly %}disabled{% endif %} />
       </div>
 
-      <div class="section-header"><p>Hospitality Details</p></div>
+      <div class="section-header"><p>{{ t('archive.hospitalityDetails') }}</p></div>
       <div class="split-two">
         <div class="field-row" data-field="dateOfHospitality">
-          <div class="field-label-line"><label>Tag der Bewirtung <span class="settings-note">/ Date of Hospitality</span></label></div>
+          <div class="field-label-line"><label>{{ t('form.date') }}</label></div>
           <input class="input-field" type="date" name="dateOfHospitality" value="{{ form.dateOfHospitality or '' }}" {% if form.isReadOnly %}disabled{% endif %} />
         </div>
         <div class="field-row" data-field="locationOfHospitality">
-          <div class="field-label-line"><label>Ort der Bewirtung <span class="settings-note">/ Location</span></label></div>
+          <div class="field-label-line"><label>{{ t('form.location') }}</label></div>
           <input class="input-field" name="locationOfHospitality" value="{{ form.locationOfHospitality or '' }}" {% if form.isReadOnly %}disabled{% endif %} />
         </div>
       </div>
       <div class="split-two">
         <div class="field-row" data-field="host">
-          <div class="field-label-line"><label>Bewirtende Person <span class="settings-note">/ Host</span></label></div>
+          <div class="field-label-line"><label>{{ t('form.host') }}</label></div>
           <input class="input-field" name="host" value="{{ form.host or session.get('name', '') }}" {% if form.isReadOnly %}disabled{% endif %} />
         </div>
         <div class="field-row" data-field="occasion">
-          <div class="field-label-line"><label>Anlass der Bewirtung <span class="settings-note">/ Occasion</span></label></div>
+          <div class="field-label-line"><label>{{ t('form.occasion') }}</label></div>
           <input class="input-field" name="occasion" value="{{ form.occasion or '' }}" {% if form.isReadOnly %}disabled{% endif %} />
         </div>
       </div>
       <div class="field-row" data-field="hostedPersons">
-        <div class="field-label-line"><label>Bewirtete Personen <span class="settings-note">/ Guests</span></label></div>
+        <div class="field-label-line"><label>{{ t('form.guests') }}</label></div>
         <textarea class="input-field" rows="4" name="hostedPersons" {% if form.isReadOnly %}disabled{% endif %}>{{ form.hostedPersonsText or '' }}</textarea>
       </div>
 
-      <div class="section-header"><p>Financial Details</p></div>
+      <div class="section-header"><p>{{ t('form.financialDetails') }}</p></div>
       <div class="field-row" data-field="merchant">
-        <div class="field-label-line"><label>Merchant</label></div>
+        <div class="field-label-line"><label>{{ t('form.merchant') }}</label></div>
         <input class="input-field" name="merchant" value="{{ form.merchant or '' }}" {% if form.isReadOnly %}disabled{% endif %} />
       </div>
       <div class="split-two">
         <div class="field-row" data-field="invoiceAmount">
-          <div class="field-label-line"><label>Invoice Amount / Rechnungsbetrag</label></div>
+          <div class="field-label-line"><label>{{ t('archive.invoiceAmount') }}</label></div>
           <input class="input-field" type="number" step="0.01" name="invoiceAmount" value="{{ form.invoiceAmount }}" {% if form.isReadOnly %}disabled{% endif %} />
         </div>
         <div class="field-row" data-field="tip">
-          <div class="field-label-line"><label>Tip / Trinkgeld</label></div>
+          <div class="field-label-line"><label>{{ t('form.tip') }}</label></div>
           <input class="input-field" type="number" step="0.01" name="tip" value="{{ form.tip }}" {% if form.isReadOnly %}disabled{% endif %} />
         </div>
       </div>
       <div class="field-row" data-field="totalAmount">
-        <div class="field-label-line"><label>Total Amount / Gesamtbetrag</label></div>
+        <div class="field-label-line"><label>{{ t('archive.totalAmount') }}</label></div>
         <input class="input-field" type="number" step="0.01" name="totalAmount" value="{{ form.totalAmount }}" {% if form.isReadOnly %}disabled{% endif %} />
       </div>
 
-      <div class="section-header"><p>Address & Details</p></div>
+      <div class="section-header"><p>{{ t('form.addressDetails') }}</p></div>
       <div class="field-row" data-field="address">
-        <div class="field-label-line"><label>Address</label></div>
+        <div class="field-label-line"><label>{{ t('form.address') }}</label></div>
         <textarea class="input-field" rows="3" name="address" {% if form.isReadOnly %}disabled{% endif %}>{{ form.address or '' }}</textarea>
       </div>
       <div class="split-two">
         <div class="field-row" data-field="date">
-          <div class="field-label-line"><label>Date</label></div>
+          <div class="field-label-line"><label>{{ t('common.date') }}</label></div>
           <input class="input-field" type="date" name="date" value="{{ form.date or '' }}" {% if form.isReadOnly %}disabled{% endif %} />
         </div>
         <div class="field-row" data-field="place">
-          <div class="field-label-line"><label>Place</label></div>
+          <div class="field-label-line"><label>{{ t('archive.place') }}</label></div>
           <input class="input-field" name="place" value="{{ form.place or '' }}" {% if form.isReadOnly %}disabled{% endif %} />
         </div>
       </div>
 
       <div class="summary-box">
-        <p><strong id="completedCounter">{{ form.completedCount }}</strong> fields completed</p>
+        <p><strong id="completedCounter">{{ form.completedCount }}</strong> {{ t('form.fieldsCompleted') }}</p>
         <p id="attentionCounterLine" {% if not form.attentionCount %}hidden{% endif %}>
-          <strong id="attentionCounter">{{ form.attentionCount }}</strong> fields need attention
+          <strong id="attentionCounter">{{ form.attentionCount }}</strong> {{ t('form.fieldsNeedAttention') }}
         </p>
         <p class="summary-total" id="summaryTotalDisplay">{{ form.totalAmount or 0 }}</p>
       </div>
 
       <div class="field-row" style="margin-top:16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-        <div class="email-status {{ form.emailDeliveryStatus }}">
-          {% if form.emailDeliveryStatus == 'sent' %}
-          <span class="email-icon">✉</span><span>Sent to {{ form.documentEmail or 'your email' }}</span>
-          {% elif form.emailDeliveryStatus == 'failed' %}
-          <span class="email-icon">✉</span><span>Delivery failed{% if form.emailError %}: {{ form.emailError }}{% endif %}</span>
-          {% else %}
-          <span class="email-icon">✉</span><span>Delivery pending...</span>
-          {% endif %}
-        </div>
-        {% if form.emailDeliveryStatus == 'failed' and form.documentId %}
-        <button class="btn-secondary" type="button" id="resendEmailBtn">Resend</button>
-        {% endif %}
         {% if form.pdfGenerated %}
-        <a class="btn-primary" href="{{ form.documentPdfUrl }}?download=1">Download PDF</a>
+        <a class="btn-primary" href="{{ form.documentPdfUrl }}?download=1">{{ t('archive.downloadPdf') }}</a>
         {% endif %}
         {% if not form.isReadOnly %}
-        <button class="btn-secondary" type="button" id="saveDraftBtn">Save Draft</button>
-        <button class="btn-danger" type="button" id="rejectBtn">Reject</button>
-        <button class="btn-primary" type="button" id="approveBtn">Approve &amp; Generate PDF →</button>
+        <button class="btn-secondary" type="button" id="saveDraftBtn">{{ t('form.saveDraft') }}</button>
+        <button class="btn-danger" type="button" id="rejectBtn">{{ t('form.reject') }}</button>
+        <button class="btn-primary" type="button" id="approveBtn">{{ t('form.approve') }} →</button>
         {% endif %}
       </div>
       {% if not form.isReadOnly %}
-      <p class="saved-indicator" id="savedIndicator">Draft saved</p>
+      <p class="saved-indicator" id="savedIndicator">{{ t('form.draftSaved') }}</p>
       <div class="reject-reason-wrap" id="rejectReasonWrap">
-        <textarea class="input-field" rows="3" id="rejectReasonInput" placeholder="Enter rejection reason..."></textarea>
+        <textarea class="input-field" rows="3" id="rejectReasonInput" placeholder="{{ t('form.enterRejectionReason') }}"></textarea>
         <div style="margin-top:8px; display:flex; gap:8px;">
-          <button class="btn-danger" type="button" id="confirmRejectBtn">Confirm Rejection</button>
-          <button class="btn-secondary" type="button" id="cancelRejectBtn">Cancel</button>
+          <button class="btn-danger" type="button" id="confirmRejectBtn">{{ t('form.confirmRejection') }}</button>
+          <button class="btn-secondary" type="button" id="cancelRejectBtn">{{ t('common.cancel') }}</button>
         </div>
       </div>
       {% endif %}
@@ -208,6 +191,13 @@
     isReadOnly: {{ form.isReadOnly | tojson }},
     missingFields: {{ form.missingFields | tojson }},
     aiConfidence: {{ form.aiConfidence | tojson }}
+  };
+  window.__folioFormI18n = {
+    required: {{ t('common.required') | tojson }},
+    lowConfidenceHint: {{ t('form.lowConfidenceHint') | tojson }},
+    draftSaved: {{ t('form.draftSaved') | tojson }},
+    viewExtractedTextDown: {{ t('form.viewExtractedTextDown') | tojson }},
+    viewExtractedTextUp: {{ t('form.viewExtractedTextUp') | tojson }}
   };
 </script>
 <script src="{{ url_for('static', filename='js/form.js') }}"></script>

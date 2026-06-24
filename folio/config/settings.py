@@ -22,6 +22,7 @@ class BaseConfig:
 
     RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
     RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "")
+    PASSWORD_RESET_TOKEN_MAX_AGE = int(os.getenv("PASSWORD_RESET_TOKEN_MAX_AGE", "3600"))
 
     APP_URL = os.getenv("APP_URL", "http://localhost:5000")
     SUPPORTED_LANGUAGES = ["en", "de"]

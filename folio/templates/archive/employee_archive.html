@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}My Archive - {{ t('app.name') }}{% endblock %}
-{% block page_title %}My Archive{% endblock %}
+{% block title %}{{ t('archive.myArchive') }} - {{ t('app.name') }}{% endblock %}
+{% block page_title %}{{ t('archive.myArchive') }}{% endblock %}
 
 {% block head_extra %}
 <style>
@@ -41,8 +41,8 @@
 {% block content %}
 <div id="archiveRoot" data-next-cursor="{{ next_cursor or '' }}">
   <div class="archive-header">
-    <h2 style="margin:0;">My Archive</h2>
-    <span class="archive-count"><span id="archiveSubmissionCount">{{ total_submissions }}</span> submissions</span>
+    <h2 style="margin:0;">{{ t('archive.myArchive') }}</h2>
+    <span class="archive-count"><span id="archiveSubmissionCount">{{ total_submissions }}</span> {{ t('common.submissions') }}</span>
   </div>
 
   <form id="archiveFilters" class="archive-filter-bar" method="get" action="{{ url_for('archive.employee_archive') }}">
@@ -50,42 +50,42 @@
       <input class="input-field" type="date" name="date_from" value="{{ filters.date_from }}" />
       <input class="input-field" type="date" name="date_to" value="{{ filters.date_to }}" />
       <select class="input-field" name="month">
-        <option value="">Month</option>
+        <option value="">{{ t('common.month') }}</option>
         {% for i in range(1, 13) %}
         <option value="{{ i }}" {% if filters.month == i|string %}selected{% endif %}>{{ i }}</option>
         {% endfor %}
       </select>
-      <input class="input-field" type="number" min="2000" max="2100" placeholder="Year" name="year" value="{{ filters.year }}" />
+      <input class="input-field" type="number" min="2000" max="2100" placeholder="{{ t('common.year') }}" name="year" value="{{ filters.year }}" />
     </div>
     <div class="archive-filter-row">
-      <input class="input-field" type="text" placeholder="Merchant" name="merchant" value="{{ filters.merchant }}" />
+      <input class="input-field" type="text" placeholder="{{ t('common.merchant') }}" name="merchant" value="{{ filters.merchant }}" />
       <select class="input-field" name="category">
-        <option value="">Category</option>
+        <option value="">{{ t('common.category') }}</option>
         {% for cat in allowed_categories %}
         <option value="{{ cat }}" {% if filters.category == cat %}selected{% endif %}>{{ cat }}</option>
         {% endfor %}
       </select>
       <select class="input-field" name="sort">
-        {% for key,label in [('newest','Newest'),('oldest','Oldest'),('amount_high','Amount High'),('amount_low','Amount Low')] %}
+        {% for key,label in [('newest',t('common.sortNewest')),('oldest',t('common.sortOldest')),('amount_high',t('common.sortAmountHigh')),('amount_low',t('common.sortAmountLow'))] %}
         <option value="{{ key }}" {% if filters.sort == key %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
       <div class="archive-filter-actions">
-        <button class="archive-clear" type="button" id="clearArchiveFilters">Clear Filters</button>
-        <button class="btn-primary" type="submit">Apply Filters</button>
+        <button class="archive-clear" type="button" id="clearArchiveFilters">{{ t('archive.clearFilters') }}</button>
+        <button class="btn-primary" type="submit">{{ t('archive.applyFilters') }}</button>
       </div>
     </div>
   </form>
 
   <div id="archiveGrid" class="archive-grid"></div>
   <div id="archiveEmpty" class="archive-empty" {% if submissions %}hidden{% endif %}>
-    <p style="margin:0 0 10px;">No submissions yet</p>
-    <a class="btn-primary" href="{{ url_for('receipts.new_receipt') }}">Scan your first receipt →</a>
+    <p style="margin:0 0 10px;">{{ t('archive.noSubmissionsYet') }}</p>
+    <a class="btn-primary" href="{{ url_for('receipts.new_receipt') }}">{{ t('archive.scanFirstReceipt') }}</a>
   </div>
 
   <div class="archive-footer">
-    <p style="margin:0; color:var(--text-secondary);">Showing <span id="archiveShowing">{{ showing_count }}</span> of <span id="archiveTotal">{{ total_submissions }}</span> submissions</p>
-    <button id="archiveLoadMore" type="button" class="btn-secondary" {% if not next_cursor %}hidden{% endif %}>Load More</button>
+    <p style="margin:0; color:var(--text-secondary);">{{ t('common.showing') }} <span id="archiveShowing">{{ showing_count }}</span> {{ t('common.of') }} <span id="archiveTotal">{{ total_submissions }}</span> {{ t('common.submissions') }}</p>
+    <button id="archiveLoadMore" type="button" class="btn-secondary" {% if not next_cursor %}hidden{% endif %}>{{ t('common.loadMore') }}</button>
   </div>
 </div>
 {% endblock %}
@@ -93,5 +93,15 @@
 {% block scripts %}
 <script>
   window.__archiveInitial = {{ submissions | tojson }};
+  window.__archiveI18n = {
+    completed: {{ t('status.complete') | tojson }},
+    error: {{ t('status.error') | tojson }},
+    processing: {{ t('status.processing') | tojson }},
+    unknownMerchant: {{ t('archive.unknownMerchant') | tojson }},
+    other: {{ t('common.other') | tojson }},
+    currencyCode: {{ t('common.currencyCode') | tojson }},
+    receiptThumbnail: {{ t('common.receiptThumbnail') | tojson }},
+    pdfLabel: "PDF"
+  };
 </script>
 {% endblock %}

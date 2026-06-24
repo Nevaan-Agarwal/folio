@@ -5,15 +5,15 @@
 
 {% block auth_content %}
 <section class="register-layout">
-  <aside class="register-brand-panel">
-    <div class="register-brand-content">
+  <aside class="register-brand-panel login-brand-panel">
+    <div class="register-brand-content login-brand-content">
+      <img
+        class="auth-brand-logo"
+        src="{{ url_for('static', filename='images/company_logo.png') }}"
+        alt="{{ t('app.logoAlt') }}"
+      />
       <h1 class="register-logo">{{ t('app.name') }}</h1>
       <p class="register-tagline">{{ t('app.tagline') }}</p>
-      <svg class="receipt-illustration" viewBox="0 0 360 220" fill="none" aria-hidden="true">
-        <path d="M70 24h180l40 40v132l-20-8-20 8-20-8-20 8-20-8-20 8-20-8-20 8-20-8V24Z" />
-        <path d="M104 78h130M104 108h130M104 138h94" />
-        <path d="M224 152c18 0 32 14 32 32" />
-      </svg>
     </div>
   </aside>
 
@@ -43,11 +43,11 @@
             <label for="password">{{ t('auth.password') }}</label>
             <input class="input-field" id="password" name="password" type="password" required />
             <div class="strength-track"><div class="strength-fill" id="strengthFill"></div></div>
-            <p class="field-help" id="strengthLabel">Weak</p>
+            <p class="field-help" id="strengthLabel">{{ t('auth.passwordWeak') }}</p>
             <p class="field-error" data-error-for="password"></p>
           </div>
           <div class="field-group field-group-full">
-            <label for="confirmPassword">Confirm Password</label>
+            <label for="confirmPassword">{{ t('auth.confirmPassword') }}</label>
             <input
               class="input-field"
               id="confirmPassword"
@@ -64,7 +64,7 @@
       </form>
 
       <p class="auth-alt-link">
-        Already have an account?
+        {{ t('auth.alreadyHaveAccount') }}
         <a href="{{ url_for('auth.login_page') }}">{{ t('auth.login') }}</a>
       </p>
     </div>
@@ -103,35 +103,35 @@
       if (score <= 1) {
         strengthFill.style.width = "33%";
         strengthFill.style.background = "var(--error)";
-        strengthLabel.textContent = "Weak";
+        strengthLabel.textContent = "{{ t('auth.passwordWeak') }}";
       } else if (score === 2) {
         strengthFill.style.width = "66%";
         strengthFill.style.background = "var(--warning)";
-        strengthLabel.textContent = "Medium";
+        strengthLabel.textContent = "{{ t('auth.passwordMedium') }}";
       } else {
         strengthFill.style.width = "100%";
         strengthFill.style.background = "var(--success)";
-        strengthLabel.textContent = "Strong";
+        strengthLabel.textContent = "{{ t('auth.passwordStrong') }}";
       }
     }
 
     function clientValidate(payload) {
       const errors = {};
       if (!payload.firstName || payload.firstName.trim().length < 2) {
-        errors.firstName = "First Name is required (min 2 characters).";
+        errors.firstName = "{{ t('auth.firstNameRequired') }}";
       }
       if (!payload.surname || payload.surname.trim().length < 2) {
-        errors.surname = "Surname is required (min 2 characters).";
+        errors.surname = "{{ t('auth.surnameRequired') }}";
       }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email || "")) {
-        errors.email = "Please provide a valid email address.";
+        errors.email = "{{ t('auth.validEmail') }}";
       }
       const password = payload.password || "";
       if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
-        errors.password = "Password must be 8+ chars with an uppercase letter and number.";
+        errors.password = "{{ t('auth.passwordRules') }}";
       }
       if (payload.confirmPassword !== password) {
-        errors.confirmPassword = "Confirm Password must match Password.";
+        errors.confirmPassword = "{{ t('auth.passwordMatch') }}";
       }
       return errors;
     }
@@ -174,13 +174,13 @@
               setError(field, data.errors[field]);
             });
           } else {
-            setError("form", "Registration failed. Please try again.");
+            setError("form", "{{ t('auth.registrationFailed') }}");
           }
           return;
         }
         window.location.assign(data.redirect || "/dashboard");
       } catch (error) {
-        setError("form", "Network error. Please try again.");
+        setError("form", "{{ t('common.networkError') }}");
       }
     });
   })();

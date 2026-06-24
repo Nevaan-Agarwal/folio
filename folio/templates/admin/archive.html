@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}Admin Archive - {{ t('app.name') }}{% endblock %}
-{% block page_title %}Admin Archive{% endblock %}
+{% block title %}{{ t('admin.archive.title') }} - {{ t('app.name') }}{% endblock %}
+{% block page_title %}{{ t('admin.archive.title') }}{% endblock %}
 
 {% block head_extra %}
 <style>
@@ -25,6 +25,7 @@
   .admin-table tbody tr:hover .admin-actions { opacity:1; }
   .admin-icon-btn { border:1px solid var(--border-default); background:transparent; color:var(--text-secondary); border-radius:8px; padding:5px 8px; }
   .admin-icon-btn:hover { border-color:var(--accent-primary); color:var(--accent-primary); }
+  .admin-thumb-fallback { display:inline-flex; width:44px; height:56px; border-radius:8px; border:1px dashed var(--border-default); align-items:center; justify-content:center; color:var(--text-muted); font-size:11px; background:var(--bg-elevated); }
   .admin-pagination { display:flex; justify-content:flex-end; gap:8px; margin-top:10px; }
   @media (max-width: 900px){ .admin-filter-row { grid-template-columns:1fr 1fr; } }
 </style>
@@ -32,8 +33,8 @@
 
 {% block content %}
 <div class="admin-header">
-  <h2 style="margin:0;">Company Archive</h2>
-  <span class="admin-badge">Admin View</span>
+  <h2 style="margin:0;">{{ t('admin.archive.companyArchive') }}</h2>
+  <span class="admin-badge">{{ t('admin.archive.adminView') }}</span>
 </div>
 
 <form class="admin-filter-card" method="get" action="{{ url_for('admin.admin_archive') }}">
@@ -41,69 +42,76 @@
     <input class="input-field" type="date" name="date_from" value="{{ filters.date_from }}" />
     <input class="input-field" type="date" name="date_to" value="{{ filters.date_to }}" />
     <select class="input-field" name="employee_id">
-      <option value="">All Employees</option>
+      <option value="">{{ t('admin.archive.allEmployees') }}</option>
       {% for employee in employees %}
       <option value="{{ employee.id }}" {% if filters.employee_id == employee.id %}selected{% endif %}>{{ employee.firstName }} {{ employee.surname }}</option>
       {% endfor %}
     </select>
     <select class="input-field" name="category">
-      <option value="">Category</option>
+      <option value="">{{ t('common.category') }}</option>
       {% for cat in ['Restaurant','Business Meal','Client Meeting','Travel','Hotel','Transportation','Office Supplies','Entertainment','Training/Workshop','Other'] %}
       <option value="{{ cat }}" {% if filters.category == cat %}selected{% endif %}>{{ cat }}</option>
       {% endfor %}
     </select>
   </div>
   <div class="admin-filter-row">
-    <input class="input-field" type="text" placeholder="Merchant" name="merchant" value="{{ filters.merchant }}" />
-    <input class="input-field" type="text" placeholder="Host" name="host" value="{{ filters.host }}" />
-    <input class="input-field" type="text" placeholder="Occasion" name="occasion" value="{{ filters.occasion }}" />
+    <input class="input-field" type="text" placeholder="{{ t('common.merchant') }}" name="merchant" value="{{ filters.merchant }}" />
+    <input class="input-field" type="text" placeholder="{{ t('common.host') }}" name="host" value="{{ filters.host }}" />
+    <input class="input-field" type="text" placeholder="{{ t('common.occasion') }}" name="occasion" value="{{ filters.occasion }}" />
     <select class="input-field" name="status">
-      <option value="">Status</option>
+      <option value="">{{ t('common.status') }}</option>
       {% for st in statuses %}
       <option value="{{ st }}" {% if filters.status == st %}selected{% endif %}>{{ st }}</option>
       {% endfor %}
     </select>
   </div>
   <div class="admin-filter-row">
-    <input class="input-field" type="number" step="0.01" name="amount_min" placeholder="Min Amount" value="{{ filters.amount_min }}" />
-    <input class="input-field" type="number" step="0.01" name="amount_max" placeholder="Max Amount" value="{{ filters.amount_max }}" />
+    <input class="input-field" type="number" step="0.01" name="amount_min" placeholder="{{ t('admin.archive.minAmount') }}" value="{{ filters.amount_min }}" />
+    <input class="input-field" type="number" step="0.01" name="amount_max" placeholder="{{ t('admin.archive.maxAmount') }}" value="{{ filters.amount_max }}" />
     <select class="input-field" name="sort">
-      {% for key,label in [('newest','Newest'),('oldest','Oldest'),('amount_high','Amount High'),('amount_low','Amount Low')] %}
+      {% for key,label in [('newest',t('common.sortNewest')),('oldest',t('common.sortOldest')),('amount_high',t('common.sortAmountHigh')),('amount_low',t('common.sortAmountLow'))] %}
       <option value="{{ key }}" {% if filters.sort == key %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
     <div class="admin-filter-actions">
-      <a class="btn-secondary" href="{{ export_csv_url }}">Export CSV</a>
-      <a class="btn-secondary" href="{{ export_xlsx_url }}">Export XLSX</a>
-      <a class="admin-clear" href="{{ url_for('admin.admin_archive') }}">Clear All</a>
-      <button class="btn-primary" type="submit">Apply</button>
+      <a class="btn-secondary" href="{{ export_csv_url }}">{{ t('common.exportCsv') }}</a>
+      <a class="btn-secondary" href="{{ export_xlsx_url }}">{{ t('common.exportXlsx') }}</a>
+      <a class="admin-clear" href="{{ url_for('admin.admin_archive') }}">{{ t('common.clearAll') }}</a>
+      <button class="btn-primary" type="submit">{{ t('common.apply') }}</button>
     </div>
   </div>
   <input type="hidden" name="page" value="1" />
   <input type="hidden" name="per_page" value="{{ per_page }}" />
 </form>
 
-<p class="admin-summary">{{ total_count }} results • Total: €{{ '%.2f'|format(total_amount) }} • Avg: €{{ '%.2f'|format(avg_amount) }}</p>
+<p class="admin-summary">{{ total_count }} {{ t('common.results') }} • {{ t('common.total') }}: €{{ '%.2f'|format(total_amount) }} • {{ t('common.average') }}: €{{ '%.2f'|format(avg_amount) }}</p>
 
 <div class="admin-table-wrap">
   <table class="admin-table">
     <thead>
       <tr>
-        <th>Thumbnail</th>
-        <th>Employee</th>
-        <th>Merchant</th>
-        <th>Date</th>
-        <th>Category</th>
-        <th>Amount</th>
-        <th>Host</th>
-        <th>Status</th>
-        <th>Actions</th>
+        <th>{{ t('common.thumbnail') }}</th>
+        <th>{{ t('common.employee') }}</th>
+        <th>{{ t('common.merchant') }}</th>
+        <th>{{ t('common.date') }}</th>
+        <th>{{ t('common.category') }}</th>
+        <th>{{ t('common.amount') }}</th>
+        <th>{{ t('common.host') }}</th>
+        <th>{{ t('common.status') }}</th>
+        <th>{{ t('common.actions') }}</th>
       </tr>
     </thead>
     <tbody>
       {% for row in rows %}
       <tr>
-        <td><img class="admin-thumb" src="{{ row.thumbnail }}" alt="receipt thumbnail" /></td>
+        <td>
+          {% if row.thumbnail %}
+          <img class="admin-thumb" src="{{ row.thumbnail }}" alt="{{ t('common.receiptThumbnail') }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';" />
+          <span class="admin-thumb-fallback" style="display:none;">{{ t('common.noImage') }}</span>
+          {% else %}
+          <span class="admin-thumb-fallback">{{ t('common.noImage') }}</span>
+          {% endif %}
+        </td>
         <td>{{ row.employee_name }}</td>
         <td>{{ row.merchant }}</td>
         <td>{{ row.date }}</td>
@@ -117,15 +125,15 @@
         </td>
         <td>
           <div class="admin-actions">
-            <a class="admin-icon-btn" href="{{ url_for('archive.archive_document_detail', document_id=row.document_id) }}">👁</a>
-            <a class="admin-icon-btn" href="{{ row.pdf_url }}" download>⬇</a>
-            <a class="admin-icon-btn" href="/admin/users/{{ row.user_id }}">👤</a>
+            <a class="admin-icon-btn" href="{{ url_for('archive.archive_document_detail', document_id=row.document_id) }}" title="{{ t('admin.archive.openSubmissionDetails') }}" aria-label="{{ t('admin.archive.openSubmissionDetails') }}">👁</a>
+            <a class="admin-icon-btn" href="{{ row.pdf_url }}?download=1" title="{{ t('archive.downloadPdf') }}" aria-label="{{ t('archive.downloadPdf') }}">⬇</a>
+            <a class="admin-icon-btn" href="/admin/users/{{ row.user_id }}" title="{{ t('admin.archive.openEmployeeProfile') }}" aria-label="{{ t('admin.archive.openEmployeeProfile') }}">👤</a>
           </div>
         </td>
       </tr>
       {% endfor %}
       {% if not rows %}
-      <tr><td colspan="9" style="text-align:center;color:var(--text-secondary);">No archive entries found.</td></tr>
+      <tr><td colspan="9" style="text-align:center;color:var(--text-secondary);">{{ t('admin.archive.noEntries') }}</td></tr>
       {% endif %}
     </tbody>
   </table>
@@ -133,10 +141,10 @@
 
 <div class="admin-pagination">
   {% if prev_url %}
-  <a class="btn-secondary" href="{{ prev_url }}">Previous</a>
+  <a class="btn-secondary" href="{{ prev_url }}">{{ t('common.previous') }}</a>
   {% endif %}
   {% if next_url %}
-  <a class="btn-secondary" href="{{ next_url }}">Next</a>
+  <a class="btn-secondary" href="{{ next_url }}">{{ t('common.next') }}</a>
   {% endif %}
 </div>
 {% endblock %}

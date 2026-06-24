@@ -1,4 +1,7 @@
 (function () {
+  const uploadI18n = window.__uploadI18n || {};
+  const processingI18n = uploadI18n.processing || {};
+  const uploadText = uploadI18n.upload || {};
   function initProcessingPage() {
     const card = document.getElementById("processingCard");
     if (!card) return;
@@ -66,13 +69,13 @@
 
       if (value >= 70) {
         ringFill.style.stroke = "var(--success)";
-        confidenceLabel.textContent = "High confidence";
+        confidenceLabel.textContent = processingI18n.highConfidence || "High confidence";
       } else if (value >= 40) {
         ringFill.style.stroke = "var(--warning)";
-        confidenceLabel.textContent = "Medium confidence";
+        confidenceLabel.textContent = processingI18n.mediumConfidence || "Medium confidence";
       } else {
         ringFill.style.stroke = "var(--error)";
-        confidenceLabel.textContent = "Low confidence — please review carefully";
+        confidenceLabel.textContent = processingI18n.lowConfidence || "Low confidence — please review carefully";
       }
     }
 
@@ -83,13 +86,13 @@
       if (!response.ok) return;
       const payload = await response.json();
 
-      statusMessage.textContent = payload.message || "Processing update in progress.";
+      statusMessage.textContent = payload.message || processingI18n.updateInProgress || "Processing update in progress.";
       const step = Number(payload.step || 1);
 
       if (payload.status === "error") {
         renderStepProgress(step || 1, true);
         errorCard.hidden = false;
-        errorMessage.textContent = payload.error || payload.message || "Processing failed.";
+        errorMessage.textContent = payload.error || payload.message || processingI18n.processingFailed || "Processing failed.";
         if (pollTimer) window.clearInterval(pollTimer);
         return;
       }
@@ -132,6 +135,10 @@
   const uploadNowBtn = document.getElementById("uploadNowBtn");
   const progressWrap = document.getElementById("uploadProgress");
   const progressFill = document.getElementById("uploadProgressFill");
+  const uploadedPreview = document.getElementById("uploadedPreview");
+  const uploadedPreviewImage = document.getElementById("uploadedPreviewImage");
+  const uploadedPreviewTitle = document.getElementById("uploadedPreviewTitle");
+  const uploadedPreviewMeta = document.getElementById("uploadedPreviewMeta");
   const tabs = document.querySelectorAll("[data-tab]");
   const panes = document.querySelectorAll("[data-pane]");
   const cameraPreview = document.getElementById("cameraPreview");
@@ -144,6 +151,21 @@
   let selectedFile = null;
   let stream = null;
   let activeTab = "file";
+  let uploadInFlight = false;
+  let uploadedPreviewObjectUrl = "";
+
+  if (uploadedPreview) {
+    uploadedPreview.hidden = true;
+  }
+  if (uploadedPreviewImage) {
+    uploadedPreviewImage.removeAttribute("src");
+  }
+  if (uploadedPreviewTitle) {
+    uploadedPreviewTitle.textContent = "";
+  }
+  if (uploadedPreviewMeta) {
+    uploadedPreviewMeta.textContent = "";
+  }
 
   function showToast(message, type, duration) {
     if (window.showToast) {
@@ -153,19 +175,24 @@
   }
 
   function bytesToMb(bytes) {
-    return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+    return (bytes / (1024 * 1024)).toFixed(2) + " " + (uploadText.mb || "MB");
   }
 
-  function setPreview(file) {
+  function setPreview(file, source) {
     selectedFile = file;
-    fileName.textContent = file.name;
-    fileSize.textContent = bytesToMb(file.size);
-    filePreview.hidden = false;
-    const reader = new FileReader();
-    reader.onload = function (event) {
-      filePreviewImage.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
+    if (fileName) fileName.textContent = file.name;
+    if (fileSize) fileSize.textContent = bytesToMb(file.size);
+    if (filePreview) filePreview.hidden = false;
+    if (filePreviewImage) {
+      const reader = new FileReader();
+      reader.onload = function (event) {
+        filePreviewImage.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+    if (source === "file") {
+      showUploadedPreview(file);
+    }
   }
 
   function setProgress(percent) {
@@ -173,11 +200,30 @@
     progressFill.style.width = Math.max(0, Math.min(percent, 100)) + "%";
   }
 
+  function showUploadedPreview(file) {
+    if (!uploadedPreview || !uploadedPreviewImage || !uploadedPreviewMeta || !file) return;
+    if (uploadedPreviewTitle) {
+      uploadedPreviewTitle.textContent = uploadText.uploadComplete || "Upload complete!";
+    }
+    uploadedPreviewMeta.textContent = (file.name || "receipt") + " • " + bytesToMb(file.size || 0);
+    if (uploadedPreviewObjectUrl) {
+      URL.revokeObjectURL(uploadedPreviewObjectUrl);
+      uploadedPreviewObjectUrl = "";
+    }
+    uploadedPreviewObjectUrl = URL.createObjectURL(file);
+    uploadedPreviewImage.src = uploadedPreviewObjectUrl;
+    uploadedPreview.hidden = false;
+  }
+
   function uploadSelectedFile(file) {
+    if (uploadInFlight) return;
     if (!file) {
-      showToast("Please select or capture a receipt image.", "warning");
+      showToast(uploadText.selectImageWarning || "Please select or capture a receipt image.", "warning");
       return;
     }
+
+    uploadInFlight = true;
+    uploadNowBtn.disabled = true;
 
     const formData = new FormData();
     formData.append("receipt", file, file.name);
@@ -201,26 +247,37 @@
       }
 
       if (xhr.status >= 200 && xhr.status < 300 && response.receiptId) {
-        showToast("Upload complete!", "success", 2200);
+        showToast(uploadText.uploadComplete || "Upload complete!", "success", 2200);
+        showUploadedPreview(file);
         window.setTimeout(function () {
           window.location.assign("/receipts/" + response.receiptId + "/processing");
-        }, 250);
+        }, 1800);
         return;
       }
 
-      const message = response.message || "Receipt upload failed. Please try again.";
+      const message = response.message || uploadText.uploadFailed || "Receipt upload failed. Please try again.";
       showToast(message, "error");
       progressWrap.hidden = true;
       progressFill.style.width = "0%";
+      uploadInFlight = false;
+      uploadNowBtn.disabled = false;
     });
 
     xhr.addEventListener("error", function () {
-      showToast("Network error while uploading receipt.", "error");
+      showToast(uploadText.networkUploadError || "Network error while uploading receipt.", "error");
       progressWrap.hidden = true;
       progressFill.style.width = "0%";
+      uploadInFlight = false;
+      uploadNowBtn.disabled = false;
     });
 
     xhr.send(formData);
+  }
+
+  function resolveSelectedFile() {
+    if (selectedFile) return selectedFile;
+    if (fileInput.files && fileInput.files[0]) return fileInput.files[0];
+    return null;
   }
 
   function stopCamera() {
@@ -266,9 +323,14 @@
     });
   });
 
+  fileInput.addEventListener("click", function () {
+    // Reset value so re-selecting the same file still triggers "change".
+    fileInput.value = "";
+  });
+
   fileInput.addEventListener("change", function () {
     if (fileInput.files && fileInput.files[0]) {
-      setPreview(fileInput.files[0]);
+      setPreview(fileInput.files[0], "file");
     }
   });
 
@@ -285,7 +347,7 @@
     event.preventDefault();
     dropzone.classList.remove("is-dragover");
     const file = event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files[0] : null;
-    if (file) setPreview(file);
+    if (file) setPreview(file, "file");
   });
 
   cameraCaptureBtn?.addEventListener("click", function () {
@@ -300,7 +362,7 @@
       function (blob) {
         if (!blob) return;
         const file = new File([blob], "camera-capture.jpg", { type: "image/jpeg" });
-        setPreview(file);
+        setPreview(file, "camera");
         switchTab("file");
       },
       "image/jpeg",
@@ -309,10 +371,14 @@
   });
 
   uploadNowBtn.addEventListener("click", function () {
-    uploadSelectedFile(selectedFile);
+    uploadSelectedFile(resolveSelectedFile());
   });
 
   window.addEventListener("beforeunload", function () {
     stopCamera();
+    if (uploadedPreviewObjectUrl) {
+      URL.revokeObjectURL(uploadedPreviewObjectUrl);
+      uploadedPreviewObjectUrl = "";
+    }
   });
 })();

@@ -73,8 +73,7 @@ def create_app(config_name: str | None = None) -> Flask:
 
     @app.route("/forgot-password", methods=["GET", "POST"])
     def forgot_password_alias():
-        code = 307 if request.method == "POST" else 302
-        return redirect(url_for("auth.forgot_password"), code=code)
+        return redirect(url_for("auth.login_page"))
 
     @app.get("/health")
     def health():

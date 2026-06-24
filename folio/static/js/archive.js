@@ -11,6 +11,7 @@
   const filtersForm = document.getElementById("archiveFilters");
   const clearBtn = document.getElementById("clearArchiveFilters");
 
+  const i18n = window.__archiveI18n || {};
   const state = {
     items: Array.isArray(window.__archiveInitial) ? window.__archiveInitial.slice() : [],
     nextCursor: root.getAttribute("data-next-cursor") || "",
@@ -27,9 +28,9 @@
 
   function statusBadge(status) {
     const value = (status || "").toLowerCase();
-    if (value === "completed" || value === "pdf_generated") return '<span class="badge-success">Completed</span>';
-    if (value === "error") return '<span class="badge-error">Error</span>';
-    return '<span class="badge-warning">Processing</span>';
+    if (value === "completed" || value === "pdf_generated") return '<span class="badge-success">' + (i18n.completed || "Completed") + "</span>";
+    if (value === "error") return '<span class="badge-error">' + (i18n.error || "Error") + "</span>";
+    return '<span class="badge-warning">' + (i18n.processing || "Processing") + "</span>";
   }
 
   function cardHtml(item) {
@@ -49,10 +50,10 @@
       '<div class="archive-top">' +
       '<img class="archive-thumb" src="' +
       (item.thumbnailUrl || "") +
-      '" alt="Receipt thumbnail" />' +
+      '" alt="' + (i18n.receiptThumbnail || "Receipt thumbnail") + '" />' +
       "<div style=\"min-width:0;flex:1;\">" +
       '<p class="archive-merchant">' +
-      (item.merchant || "Unknown Merchant") +
+      (item.merchant || i18n.unknownMerchant || "Unknown Merchant") +
       "</p>" +
       '<p class="archive-date">' +
       (item.date || "-") +
@@ -61,18 +62,18 @@
       '<div class="archive-middle"><span class="cat-pill ' +
       categoryClass(item.category) +
       '">' +
-      (item.category || "Other") +
+      (item.category || i18n.other || "Other") +
       "</span></div>" +
       '<p class="archive-occasion">' +
       occasion +
       "</p>" +
-      '<div class="archive-bottom"><span class="archive-total">EUR ' +
+      '<div class="archive-bottom"><span class="archive-total">' + (i18n.currencyCode || "EUR") + " " +
       totalAmount +
       "</span>" +
       statusBadge(item.status) +
       '<a class="archive-pdf-btn" href="' +
       (item.pdfUrl || "#") +
-      '" target="_blank" rel="noopener">PDF</a></div>' +
+      '" target="_blank" rel="noopener">' + (i18n.pdfLabel || "PDF") + "</a></div>" +
       "</div>" +
       "</article>"
     );
@@ -177,10 +178,11 @@
     window.location.href = "/search?q=" + encodeURIComponent(normalized);
   }
 
+  const globalI18n = (window.__folioI18n && window.__folioI18n.common) || {};
   function renderRecentSearches() {
     const recent = loadRecentSearches();
     if (!recent.length) {
-      openDropdown('<div class="global-search-empty">No recent searches</div>');
+      openDropdown('<div class="global-search-empty">' + (globalI18n.noRecentSearches || "No recent searches") + "</div>");
       return;
     }
     openDropdown(
@@ -191,7 +193,7 @@
             term.replace(/"/g, "&quot;") +
             '"><strong>' +
             term.replace(/</g, "&lt;") +
-            '</strong><div class="meta">Recent search</div></button>'
+            '</strong><div class="meta">' + (globalI18n.recentSearch || "Recent search") + "</div></button>"
           );
         })
         .join("")
@@ -222,7 +224,7 @@
       if (latestQuery !== currentQuery) return;
       const results = payload.results || [];
       if (!results.length) {
-        openDropdown('<div class="global-search-empty">No quick matches</div>');
+        openDropdown('<div class="global-search-empty">' + (globalI18n.noQuickMatches || "No quick matches") + "</div>");
         return;
       }
       openDropdown(
@@ -237,7 +239,7 @@
               '</strong></div>' +
               '<div class="meta">' +
               String(item.date || "-").replace(/</g, "&lt;") +
-              " • € " +
+              " • " + (globalI18n.currencyCode || "EUR") + " " +
               Number(item.amount || 0).toFixed(2) +
               "</div>" +
               "</button>"

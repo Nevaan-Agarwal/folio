@@ -1,12 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 from app import create_app
 from config import database as database_config
-from models.document import CombinedDocumentModel
-from models.form import FormModel
-from routes import documents as documents_routes
 from services.email_service import EmailService
 
 
@@ -106,18 +101,76 @@ def test_email_sends_with_pdf_attachment(monkeypatch):
 
 def test_email_subject_correct_format():
     service = EmailService()
+    context = service._template_context("Alice", _form_data(), "https://example.com/pdf", "doc-10")
     assert (
-        service._build_subject(_form_data())
+        service._build_subject(_form_data(), context)
         == "Your Folio Expense Report — Cafe Berlin 2026-06-17"
     )
 
 
 def test_german_user_receives_german_subject():
     service = EmailService()
+    context = service._template_context("Alice", _form_data(language="de"), "https://example.com/pdf", "doc-11")
     assert (
-        service._build_subject(_form_data(language="de"))
+        service._build_subject(_form_data(language="de"), context)
         == "Ihr Folio Spesenbericht — Cafe Berlin 2026-06-17"
     )
+
+
+def test_custom_email_templates_use_employee_and_document_placeholders(monkeypatch):
+    monkeypatch.setenv(
+        "FOLIO_EMAIL_SUBJECT_TEMPLATE",
+        "Expense update for {{ employee_name }}: {{ document_merchant }} ({{ document_date }})",
+    )
+    monkeypatch.setenv(
+        "FOLIO_EMAIL_TEXT_TEMPLATE",
+        "Hi {{ employee_name }}, your document {{ document_id }} from {{ document_merchant }} totals {{ document_total }}.",
+    )
+    service = EmailService()
+    context = service._template_context("Alice Meyer", _form_data(), "https://example.com/pdf", "doc-12")
+
+    subject = service._build_subject(_form_data(), context)
+    plain_text = service._build_plain_text(context)
+
+    assert subject == "Expense update for Alice Meyer: Cafe Berlin (2026-06-17)"
+    assert "Hi Alice Meyer, your document doc-12 from Cafe Berlin totals EUR 119.95." in plain_text
+
+
+def test_resend_configuration_rejects_invalid_api_key_format(monkeypatch):
+    monkeypatch.setenv("RESEND_API_KEY", "invalid-key")
+    monkeypatch.setenv("RESEND_FROM_EMAIL", "Folio <onboarding@resend.dev>")
+    service = EmailService()
+
+    _api_key, _from_email, config_error = service._resolve_resend_config()
+
+    assert config_error is not None
+    assert "starts with re_" in config_error
+
+
+def test_sender_restriction_retries_with_onboarding_sender(monkeypatch):
+    service = EmailService()
+    monkeypatch.setattr(service, "_resolve_resend_config", lambda: ("re_test_key", "owner@gmail.com", None))
+    calls = {"from_values": []}
+
+    def _fake_request(api_key, payload):
+        calls["from_values"].append(payload.get("from"))
+        if payload.get("from") == "owner@gmail.com":
+            return None, "Resend error: 403 sender not verified"
+        return "msg-fallback", None
+
+    monkeypatch.setattr(service, "_perform_resend_request", _fake_request)
+    message_id, send_error = service._send_via_resend(
+        to_email="alice@example.com",
+        subject="Test",
+        plain_text="Hello",
+        html_content="<p>Hello</p>",
+        pdf_bytes=b"%PDF",
+        filename="file.pdf",
+    )
+
+    assert message_id == "msg-fallback"
+    assert send_error is None
+    assert calls["from_values"] == ["owner@gmail.com", "Folio <onboarding@resend.dev>"]
 
 
 def test_delivery_status_saved_to_database(monkeypatch):
@@ -140,59 +193,8 @@ def test_delivery_status_saved_to_database(monkeypatch):
     assert saved["emailSent"] is True
 
 
-def test_resend_works_after_initial_failure(monkeypatch):
+def test_resend_endpoint_disabled(monkeypatch):
     app = create_app("testing")
-    monkeypatch.setattr(database_config, "bucket", _FakeBucket())
-    monkeypatch.setattr(database_config, "db", _FakeDB())
-
-    document = CombinedDocumentModel(
-        id="doc-3",
-        formId="form-1",
-        receiptId="receipt-1",
-        userId="user-1",
-        filePath="combined_documents/user-1/doc-3/folio_20260617.pdf",
-        downloadUrl="https://example.com/pdf",
-        emailSent=True,
-        emailDeliveryStatus="failed",
-        userEmail="alice@example.com",
-    )
-    monkeypatch.setattr(documents_routes.combined_document_repository, "get_document", lambda _doc_id: document)
-    monkeypatch.setattr(
-        documents_routes.form_repository,
-        "get_form",
-        lambda _fid: FormModel(
-            id="form-1",
-            receiptId="receipt-1",
-            userId="user-1",
-            type="Hospitality Expense",
-            expenseCategory="Business Meal",
-            host="Alice",
-            hostedPersons=["Bob"],
-            occasion="Meeting",
-            dateOfHospitality="2026-06-17",
-            locationOfHospitality="Berlin",
-            invoiceAmount=9.0,
-            tip=1.0,
-            totalAmount=10.0,
-            merchant="Cafe Berlin",
-            receiptNumber="R-1",
-            date="2026-06-17",
-            place="Berlin",
-            createdAt=datetime.now(timezone.utc),
-            updatedAt=datetime.now(timezone.utc),
-        ),
-    )
-    monkeypatch.setattr(
-        documents_routes.user_repository,
-        "get_user",
-        lambda _uid: type("UserObj", (), {"firstName": "Alice", "surname": "Meyer", "email": "alice@example.com", "language": "en"})(),
-    )
-    monkeypatch.setattr(
-        documents_routes.email_service,
-        "send_pdf_delivery",
-        lambda **_kwargs: {"success": True, "message_id": "resend-1", "error": None},
-    )
-
     with app.test_client() as client:
         with client.session_transaction() as flask_session:
             flask_session["uid"] = "user-1"
@@ -201,8 +203,8 @@ def test_resend_works_after_initial_failure(monkeypatch):
             flask_session["name"] = "Alice"
         response = client.post("/documents/doc-3/resend-email")
 
-    assert response.status_code == 200
-    assert response.get_json()["success"] is True
+    assert response.status_code == 410
+    assert response.get_json()["success"] is False
 
 
 def test_pdf_attachment_is_correct_file(monkeypatch):

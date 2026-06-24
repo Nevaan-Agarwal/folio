@@ -336,6 +336,7 @@ class _SQLBackend:
             for statement in statements:
                 cur.execute(statement)
             alter_statements = [
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT ''",
                 "ALTER TABLE receipts ADD COLUMN IF NOT EXISTS pdf_url TEXT DEFAULT ''",
                 "ALTER TABLE forms ADD COLUMN IF NOT EXISTS rejection_reason TEXT DEFAULT ''",
                 "ALTER TABLE combined_documents ADD COLUMN IF NOT EXISTS email_error TEXT",

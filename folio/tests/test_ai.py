@@ -148,6 +148,38 @@ def test_labeled_ocr_amounts_correct_ai_field_mismatch(monkeypatch):
     assert form_payload["total"] == 37.0
 
 
+def test_ai_fallback_populates_hospitality_fields_for_form_compatibility(monkeypatch):
+    calls = _setup_repo_mocks(monkeypatch)
+    payload = _valid_payload()
+    payload["subtotal"] = None
+    payload["total"] = 42.5
+    payload["tagDerBewirtung"] = None
+    payload["ortDerBewirtung"] = None
+    payload["anlasDerBewirtung"] = None
+    payload["suggestedDescription"] = "Team workshop lunch"
+    service = AiService(client=_build_client(payload))
+
+    result = service.process_receipt(
+        "r10",
+        "\n".join(
+            [
+                "Bistro Mitte",
+                "Street 12 Berlin",
+                "Date 2026-06-17",
+                "Total 42.50 EUR",
+            ]
+        ),
+    )
+
+    assert result["subtotal"] == 42.5
+    assert result["tagDerBewirtung"] == "2026-06-17"
+    assert result["ortDerBewirtung"] is not None
+    assert result["anlasDerBewirtung"] == "Team workshop lunch"
+    form_payload = calls["form"][0][2]
+    assert form_payload["subtotal"] == 42.5
+    assert form_payload["total"] == 42.5
+
+
 def test_date_always_iso_format_or_null(monkeypatch):
     _setup_repo_mocks(monkeypatch)
     payload = _valid_payload()

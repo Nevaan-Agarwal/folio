@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import shutil
-import threading
 import urllib.request
 from datetime import datetime, timezone
 from io import BytesIO
@@ -14,7 +13,6 @@ from urllib.parse import unquote, urlparse
 
 from config import database as database_config
 from repositories import audit_repository
-from services import email_service
 
 try:
     from reportlab.lib.pagesizes import A4
@@ -62,15 +60,12 @@ class PdfService:
             ParagraphStyle(
                 name="FolioSectionHeader",
                 parent=self.styles["Heading4"],
-                textColor=self.AMBER,
-                backColor=self.SURFACE,
+                textColor=self.NAVY,
                 fontName="Helvetica-Bold",
                 fontSize=10,
                 leading=12,
                 spaceBefore=10,
                 spaceAfter=8,
-                leftIndent=6,
-                rightIndent=6,
                 uppercase=True,
             )
         )
@@ -269,8 +264,9 @@ class PdfService:
         guests_table = Table(guest_rows, colWidths=[20 * mm, 160 * mm])
         guests_style = [
             ("GRID", (0, 0), (-1, -1), 0.4, self.BORDER),
-            ("BACKGROUND", (0, 0), (-1, 0), self.SURFACE),
-            ("TEXTCOLOR", (0, 0), (-1, 0), self.AMBER),
+            ("BACKGROUND", (0, 0), (-1, 0), self.WHITE),
+            ("TEXTCOLOR", (0, 0), (-1, 0), self.NAVY),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ]
         for row_idx in range(1, len(guest_rows)):
             if row_idx % 2 == 0:
@@ -291,7 +287,7 @@ class PdfService:
                 [
                     ("GRID", (0, 0), (-1, -1), 0.6, self.BORDER),
                     ("BACKGROUND", (0, 2), (-1, 2), self.NAVY),
-                    ("TEXTCOLOR", (0, 2), (-1, 2), self.AMBER),
+                    ("TEXTCOLOR", (0, 2), (-1, 2), self.WHITE),
                     ("FONTNAME", (0, 2), (-1, 2), "Helvetica-Bold"),
                     ("FONTSIZE", (0, 2), (-1, 2), 12),
                     ("ALIGN", (1, 0), (1, -1), "RIGHT"),
@@ -483,17 +479,8 @@ class PdfService:
         pdf_bytes: bytes,
         document_id: str,
     ) -> None:
-        recipient = user_data.get("email")
-        if not recipient:
-            return
-        email_service.send_pdf_delivery(
-            to_email=recipient,
-            user_name=f"{user_data.get('firstName', '')} {user_data.get('surname', '')}".strip() or "User",
-            form_data=form_data,
-            pdf_download_url=download_url,
-            pdf_bytes=pdf_bytes,
-            document_id=document_id,
-        )
+        # Email notifications are disabled for this deployment.
+        return
 
     def generate_pdf(self, form_id: str, receipt_id: str, user_id: str) -> str:
         form_data = self._fetch_form_data(form_id)
@@ -558,11 +545,6 @@ class PdfService:
                     "documentId": document_id,
                 },
             )
-            threading.Thread(
-                target=self._send_document_email,
-                args=(user_data, form_data, download_url, pdf_bytes, document_id),
-                daemon=True,
-            ).start()
             return download_url
         finally:
             if receipt_image_path and os.path.exists(receipt_image_path):

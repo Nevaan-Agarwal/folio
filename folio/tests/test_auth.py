@@ -154,26 +154,54 @@ def test_rate_limiting_after_5_failures(monkeypatch):
     assert payload["code"] == 429
 
 
-def test_password_reset_sends_email(monkeypatch):
-    calls = {"email": 0, "audit": 0}
-
-    monkeypatch.setattr(
-        auth_routes,
-        "_send_password_reset_email",
-        lambda email, reset_link: calls.__setitem__("email", calls["email"] + 1),
-    )
-    monkeypatch.setattr(
-        auth_routes.audit_repository,
-        "create_log",
-        lambda *args, **kwargs: calls.__setitem__("audit", calls["audit"] + 1),
-    )
+def test_password_reset_is_disabled():
     app = create_app("testing")
     with app.test_client() as client:
         response = client.post("/auth/forgot-password", json={"email": "alice@example.com"})
 
-    assert response.status_code == 200
-    assert calls["email"] == 1
-    assert calls["audit"] == 1
+    assert response.status_code == 410
+    assert response.get_json()["status"] == "disabled"
+
+
+def test_reset_password_endpoint_is_disabled():
+    app = create_app("testing")
+    with app.test_client() as client:
+        response = client.post(
+            "/auth/reset-password/any-token",
+            json={"password": "NewStrongPass9", "confirmPassword": "NewStrongPass9"},
+        )
+
+    assert response.status_code == 410
+    assert response.get_json()["status"] == "disabled"
+
+
+def test_settings_password_reset_action_is_disabled(monkeypatch):
+    app = create_app("testing")
+    monkeypatch.setattr(
+        auth_routes.user_repository,
+        "get_user",
+        lambda uid: UserModel(
+            id=uid,
+            firstName="Alice",
+            surname="Meyer",
+            email="alice@example.com",
+            role="employee",
+            language="en",
+            createdAt=datetime.now(timezone.utc),
+        ),
+    )
+    with app.test_client() as client:
+        with client.session_transaction() as flask_session:
+            flask_session["uid"] = "uid-123"
+            flask_session["role"] = "employee"
+            flask_session["lang"] = "en"
+        response = client.post(
+            "/auth/settings",
+            json={"action": "password_reset"},
+        )
+
+    assert response.status_code == 410
+    assert response.get_json()["status"] == "disabled"
 
 
 def test_account_settings_updates_database(monkeypatch):
@@ -303,3 +331,96 @@ def test_role_not_shown_in_edit_form(monkeypatch):
     assert response.status_code == 200
     assert 'name="role"' not in body
     assert 'name="email"' not in body
+
+
+def test_register_succeeds_without_role_field():
+    app = create_app("testing")
+    with app.test_client() as client:
+        response = client.post(
+            "/auth/register",
+            json={
+                "firstName": "Alice",
+                "surname": "Meyer",
+                "email": "alice@example.com",
+                "password": "StrongPass9",
+                "confirmPassword": "StrongPass9",
+            },
+        )
+    assert response.status_code == 200
+
+
+def test_register_forces_employee_role(monkeypatch):
+    app = create_app("testing")
+    captured = {}
+
+    monkeypatch.setattr(auth_routes.user_repository, "get_user_by_email", lambda email: None)
+    monkeypatch.setattr(
+        auth_routes.user_repository,
+        "create_user",
+        lambda uid, first_name, surname, email, role, password_hash="": captured.update(
+            {
+                "uid": uid,
+                "firstName": first_name,
+                "surname": surname,
+                "email": email,
+                "role": role,
+                "passwordHash": password_hash,
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        auth_routes.user_repository,
+        "get_user",
+        lambda uid: UserModel(
+            id=uid,
+            firstName=captured.get("firstName", ""),
+            surname=captured.get("surname", ""),
+            email=captured.get("email", ""),
+            passwordHash=captured.get("passwordHash", ""),
+            role=captured.get("role", ""),
+            language="en",
+            createdAt=datetime.now(timezone.utc),
+        ),
+    )
+    monkeypatch.setattr(auth_routes.audit_repository, "create_log", lambda *args, **kwargs: None)
+
+    with app.test_client() as client:
+        response = client.post(
+            "/auth/register",
+            json={
+                "firstName": "Alice",
+                "surname": "Meyer",
+                "email": "alice@example.com",
+                "role": "admin",
+                "password": "StrongPass9",
+                "confirmPassword": "StrongPass9",
+            },
+        )
+        assert response.status_code == 200
+        with client.session_transaction() as flask_session:
+            assert flask_session["role"] == "employee"
+
+    assert captured["role"] == "employee"
+
+
+def test_complete_onboarding_updates_user_and_session(monkeypatch):
+    app = create_app("testing")
+    calls = {}
+    monkeypatch.setattr(
+        auth_routes.user_repository,
+        "update_user",
+        lambda uid, data: calls.update({"uid": uid, "data": data}),
+    )
+    monkeypatch.setattr(auth_routes.audit_repository, "create_log", lambda *args, **kwargs: None)
+    with app.test_client() as client:
+        with client.session_transaction() as flask_session:
+            flask_session["uid"] = "uid-123"
+            flask_session["role"] = "employee"
+            flask_session["lang"] = "en"
+            flask_session["onboarding_completed"] = False
+        response = client.post("/auth/onboarding/complete")
+        assert response.status_code == 200
+        with client.session_transaction() as flask_session:
+            assert flask_session["onboarding_completed"] is True
+    assert calls["uid"] == "uid-123"
+    assert calls["data"] == {"onboardingCompleted": True}

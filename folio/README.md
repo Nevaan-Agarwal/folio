@@ -32,6 +32,14 @@ OCR extraction, AI analysis, document storage, and hospitality expense workflows
    - `OPENAI_API_KEY`
    - `RESEND_API_KEY`
    - `RESEND_FROM_EMAIL`
+   - Optional email template variables:
+     - `FOLIO_EMAIL_SUBJECT_TEMPLATE` (Jinja placeholders like `{{ employee_name }}`, `{{ document_merchant }}`)
+     - `FOLIO_EMAIL_TEXT_TEMPLATE` (plain text body with placeholders)
+     - `FOLIO_EMAIL_INTRO_TEMPLATE` (intro sentence in HTML email)
+     - `FOLIO_EMAIL_CTA_LABEL` (button label in HTML email)
+     - `FOLIO_EMAIL_FOOTER_TEMPLATE` (footer note in HTML email)
+   - Optional password reset token setting:
+     - `PASSWORD_RESET_TOKEN_MAX_AGE` (seconds, default `3600`)
 5. Ensure PostgreSQL is running and database exists.
 6. Run development server:
    ```bash

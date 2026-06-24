@@ -14,22 +14,24 @@
   }
   .scan-tips h3 { margin: 0 0 8px; font-size: 14px; color: var(--accent-primary); }
   .scan-tips ul { margin: 0; padding-left: 18px; color: var(--text-secondary); font-size: 13px; line-height: 1.45; }
+  .file-preview[hidden],
+  #uploadedPreview[hidden] { display: none !important; }
 </style>
 {% endblock %}
 
 {% block content %}
 <section class="card upload-page-card">
-  <div class="scan-tips" role="note" aria-label="Scan quality tips">
-    <h3>For best scan quality</h3>
+  <div class="scan-tips" role="note" aria-label="{{ t('receipt.scanQualityTipsAria') }}">
+    <h3>{{ t('receipt.scanQualityTitle') }}</h3>
     <ul>
-      <li>Place receipt on a flat, dark background with strong lighting.</li>
-      <li>Capture the full receipt (all corners visible) with no blur or shadows.</li>
-      <li>Keep text upright and avoid glare for better OCR confidence.</li>
+      <li>{{ t('receipt.scanTip1') }}</li>
+      <li>{{ t('receipt.scanTip2') }}</li>
+      <li>{{ t('receipt.scanTip3') }}</li>
     </ul>
   </div>
-  <div class="upload-tabs" role="tablist" aria-label="Upload mode">
-    <button class="upload-tab upload-tab-active" type="button" data-tab="file">Upload File</button>
-    <button class="upload-tab" type="button" data-tab="camera">Use Camera</button>
+  <div class="upload-tabs" role="tablist" aria-label="{{ t('receipt.uploadModeAria') }}">
+    <button class="upload-tab upload-tab-active" type="button" data-tab="file">{{ t('receipt.uploadFile') }}</button>
+    <button class="upload-tab" type="button" data-tab="camera">{{ t('receipt.useCamera') }}</button>
   </div>
 
   <div class="upload-pane" data-pane="file">
@@ -38,37 +40,38 @@
       <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path d="M12 16V6m0 0-4 4m4-4 4 4M5 14.5V18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3.5" />
       </svg>
-      <h3>Drag your receipt here</h3>
-      <p class="dropzone-subtext">or click to browse</p>
-      <p class="dropzone-note">JPG, PNG, WEBP up to 15MB</p>
+      <h3>{{ t('receipt.dragReceiptHere') }}</h3>
+      <p class="dropzone-subtext">{{ t('receipt.orClickToBrowse') }}</p>
+      <p class="dropzone-note">{{ t('receipt.allowedFormats') }}</p>
     </label>
 
-    <div id="filePreview" class="file-preview" hidden>
-      <img id="filePreviewImage" alt="Receipt preview" />
-      <div>
-        <p id="fileName" class="file-name"></p>
-        <p id="fileSize" class="file-size"></p>
-      </div>
-    </div>
   </div>
 
   <div class="upload-pane" data-pane="camera" hidden>
     <div id="cameraDeniedState" class="camera-denied" hidden>
-      <p class="camera-denied-title">Camera access denied</p>
-      <p>Allow camera permissions in your browser settings, then retry.</p>
+      <p class="camera-denied-title">{{ t('receipt.cameraDeniedTitle') }}</p>
+      <p>{{ t('receipt.cameraDeniedBody') }}</p>
     </div>
     <div class="camera-preview-wrap">
       <video id="cameraPreview" autoplay playsinline muted></video>
       <canvas id="cameraCanvas" hidden></canvas>
     </div>
-    <button class="btn-primary camera-capture-btn" type="button" id="cameraCaptureBtn">Capture</button>
+    <button class="btn-primary camera-capture-btn" type="button" id="cameraCaptureBtn">{{ t('receipt.capture') }}</button>
   </div>
 
-  <button class="btn-primary upload-submit" type="button" id="uploadNowBtn">Upload Receipt</button>
+  <button class="btn-primary upload-submit" type="button" id="uploadNowBtn">{{ t('receipt.upload') }}</button>
 
   <div class="upload-progress" id="uploadProgress" hidden>
     <div class="upload-progress-track">
       <div class="upload-progress-fill" id="uploadProgressFill"></div>
+    </div>
+  </div>
+
+  <div id="uploadedPreview" class="file-preview" hidden>
+    <img id="uploadedPreviewImage" alt="{{ t('receipt.receiptPreview') }}" />
+    <div>
+      <p class="file-name" id="uploadedPreviewTitle"></p>
+      <p class="file-size" id="uploadedPreviewMeta"></p>
     </div>
   </div>
 </section>
@@ -77,5 +80,23 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+  window.__uploadI18n = {
+    processing: {
+      highConfidence: {{ t('receipt.highConfidence') | tojson }},
+      mediumConfidence: {{ t('receipt.mediumConfidence') | tojson }},
+      lowConfidence: {{ t('receipt.lowConfidence') | tojson }},
+      updateInProgress: {{ t('receipt.updateInProgress') | tojson }},
+      processingFailed: {{ t('receipt.processingFailed') | tojson }}
+    },
+    upload: {
+      mb: {{ t('common.mb') | tojson }},
+      selectImageWarning: {{ t('receipt.selectImageWarning') | tojson }},
+      uploadComplete: {{ t('receipt.uploadComplete') | tojson }},
+      uploadFailed: {{ t('errors.uploadFailed') | tojson }},
+      networkUploadError: {{ t('receipt.networkUploadError') | tojson }}
+    }
+  };
+</script>
 <script src="{{ url_for('static', filename='js/upload.js') }}"></script>
 {% endblock %}

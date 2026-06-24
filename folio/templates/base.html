@@ -18,12 +18,14 @@
         width: 16rem;
         border: 1px solid var(--border-default);
         background: var(--bg-primary);
-        color: var(--text-primary);
+        color: #ffffff;
         border-radius: 999px;
         padding: 9px 12px 9px 34px;
         font-size: 13px;
         transition: width .18s ease, border-color .18s ease;
       }
+      .global-search::placeholder { color: #c9d3ee; }
+      .global-search { caret-color: #ffffff; }
       .global-search:focus {
         width: 20rem;
         outline: none;
@@ -92,7 +94,22 @@
       {% block auth_content %}{% endblock %}
     </div>
     {% else %}
-    <button class="hamburger-btn" id="sidebarToggle" aria-label="Toggle navigation">
+    {% set sidebar_display_name = (session.get('name') or session.get('email') or t('common.user')) %}
+    {% set _parts = sidebar_display_name.split() %}
+    {% if _parts|length >= 2 %}
+      {% set sidebar_initials = (_parts[0][0] ~ _parts[-1][0]).upper() %}
+    {% elif _parts|length == 1 and _parts[0] %}
+      {% set sidebar_initials = _parts[0][:2].upper() %}
+    {% else %}
+      {% set sidebar_initials = 'U' %}
+    {% endif %}
+    {% set current_path = request.path or '' %}
+    {% set nav_dashboard_active = current_path.startswith('/dashboard') or current_path.startswith('/auth/dashboard') %}
+    {% set nav_scan_active = current_path.startswith('/receipts') or current_path.startswith('/forms') or current_path.startswith('/pdf') %}
+    {% set nav_settings_active = current_path.startswith('/auth/settings') or current_path.startswith('/settings') %}
+    {% set nav_archive_active = current_path.startswith('/archive') %}
+    {% set nav_admin_active = current_path.startswith('/admin') %}
+    <button class="hamburger-btn" id="sidebarToggle" aria-label="{{ t('common.toggleNavigation') }}">
       <span></span>
       <span></span>
       <span></span>
@@ -100,9 +117,12 @@
 
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-top">
-        <a class="logo" href="{{ url_for('index') }}">{{ t('app.name') }}</a>
-        <nav class="nav-list" aria-label="Main navigation">
-          <a class="nav-item nav-item-active" href="{{ url_for('auth.dashboard') }}">
+        <a class="logo" href="{{ url_for('index') }}">
+          <img class="logo-mark" src="{{ url_for('static', filename='images/company_logo.png') }}" alt="{{ t('app.logoAlt') }}" />
+          <span>{{ t('app.name') }}</span>
+        </a>
+        <nav class="nav-list" aria-label="{{ t('common.mainNavigation') }}">
+          <a class="nav-item {% if nav_dashboard_active %}nav-item-active{% endif %}" href="{{ url_for('auth.dashboard') }}">
             <span class="nav-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none">
                 <path d="M4 4h7v7H4V4Zm9 0h7v4h-7V4Zm0 6h7v10h-7V10Zm-9 3h7v7H4v-7Z" />
@@ -110,7 +130,7 @@
             </span>
             <span data-i18n-key="nav.dashboard">{{ t('nav.dashboard') }}</span>
           </a>
-          <a class="nav-item" href="{{ url_for('receipts.new_receipt') }}">
+          <a class="nav-item {% if nav_scan_active %}nav-item-active{% endif %}" href="{{ url_for('receipts.new_receipt') }}">
             <span class="nav-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none">
                 <path d="M7 3h10v2h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h3V3Zm2 2h6V5H9v2Zm10 2H5v12h14V7Zm-3 3v2H8v-2h8Z" />
@@ -118,7 +138,7 @@
             </span>
             <span data-i18n-key="nav.scan">{{ t('nav.scan') }}</span>
           </a>
-          <a class="nav-item" href="{{ url_for('auth.settings') }}">
+          <a class="nav-item {% if nav_settings_active %}nav-item-active{% endif %}" href="{{ url_for('auth.settings') }}">
             <span class="nav-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none">
                 <path d="M6 2h9l5 5v15a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm8 1.5V8h4.5L14 3.5ZM8 11h8v2H8v-2Zm0 4h8v2H8v-2Z" />
@@ -126,7 +146,7 @@
             </span>
             <span data-i18n-key="nav.settings">{{ t('nav.settings') }}</span>
           </a>
-          <a class="nav-item" href="{{ url_for('archive.employee_archive') }}">
+          <a class="nav-item {% if nav_archive_active %}nav-item-active{% endif %}" href="{{ url_for('archive.employee_archive') }}">
             <span class="nav-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none">
                 <path d="M4 5a2 2 0 0 1 2-2h11l3 3v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5Zm2 1v13h12V7h-4V3H6v3Zm2 3h8v2H8V9Zm0 4h8v2H8v-2Z" />
@@ -134,22 +154,24 @@
             </span>
             <span data-i18n-key="nav.archive">{{ t('nav.archive') }}</span>
           </a>
-          <a class="nav-item" href="{{ url_for('admin.admin_status') }}">
-            <span class="nav-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none">
-                <path d="M12 2a3 3 0 0 1 3 3v1.1a6.99 6.99 0 0 1 3.03 1.75l.78-.45a3 3 0 1 1 3 5.2l-.78.45a6.98 6.98 0 0 1 0 3.5l.78.45a3 3 0 1 1-3 5.2l-.78-.45A7 7 0 0 1 15 17.9V19a3 3 0 1 1-6 0v-1.1a6.99 6.99 0 0 1-3.03-1.75l-.78.45a3 3 0 1 1-3-5.2l.78-.45a6.98 6.98 0 0 1 0-3.5l-.78-.45a3 3 0 1 1 3-5.2l.78.45A7 7 0 0 1 9 6.1V5a3 3 0 0 1 3-3Zm0 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z" />
-              </svg>
-            </span>
-            <span data-i18n-key="nav.admin">{{ t('nav.admin') }}</span>
-          </a>
+          {% if session.get('role') == 'admin' %}
+            <a class="nav-item {% if nav_admin_active %}nav-item-active{% endif %}" href="{{ url_for('admin.admin_status') }}">
+              <span class="nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2a3 3 0 0 1 3 3v1.1a6.99 6.99 0 0 1 3.03 1.75l.78-.45a3 3 0 1 1 3 5.2l-.78.45a6.98 6.98 0 0 1 0 3.5l.78.45a3 3 0 1 1-3 5.2l-.78-.45A7 7 0 0 1 15 17.9V19a3 3 0 1 1-6 0v-1.1a6.99 6.99 0 0 1-3.03-1.75l-.78.45a3 3 0 1 1-3-5.2l.78-.45a6.98 6.98 0 0 1 0-3.5l-.78-.45a3 3 0 1 1 3-5.2l.78.45A7 7 0 0 1 9 6.1V5a3 3 0 0 1 3-3Zm0 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z" />
+                </svg>
+              </span>
+              <span data-i18n-key="nav.admin">{{ t('nav.admin') }}</span>
+            </a>
+          {% endif %}
         </nav>
       </div>
 
       <div class="sidebar-bottom">
         <div class="user-profile">
-          <span class="avatar" aria-hidden="true">NA</span>
+          <span class="avatar" aria-hidden="true">{{ sidebar_initials }}</span>
           <div class="user-meta">
-            <p class="user-name">Nevaan Agarwal</p>
+            <p class="user-name">{{ sidebar_display_name }}</p>
             <a href="{{ url_for('auth.logout') }}" class="logout-link" data-i18n-key="auth.logout">{{ t('auth.logout') }}</a>
           </div>
         </div>
@@ -166,14 +188,14 @@
               id="globalSearchInput"
               class="global-search"
               type="search"
-              placeholder="Search receipts, merchants, categories..."
+              placeholder="{{ t('search.placeholder') }}"
               autocomplete="off"
             />
             <div class="global-search-dropdown" id="globalSearchDropdown" hidden></div>
           </div>
           {% include "components/notifications.html" %}
           <span class="topbar-user">{{ session.get('name', t('app.tagline')) }}</span>
-          <div class="language-switcher" role="group" aria-label="Language switcher">
+          <div class="language-switcher" role="group" aria-label="{{ t('settings.languagePreference') }}">
             <button
               class="lang-pill {% if current_lang() == 'en' %}lang-pill-active{% endif %}"
               type="button"
@@ -251,6 +273,23 @@
           });
         });
       })();
+    </script>
+    <script>
+      window.__folioI18n = {
+        common: {
+          user: {{ t('common.user') | tojson }},
+          noRecentSearches: {{ t('search.noRecentSearches') | tojson }},
+          recentSearch: {{ t('search.recentSearch') | tojson }},
+          noQuickMatches: {{ t('search.noQuickMatches') | tojson }},
+          completed: {{ t('status.complete') | tojson }},
+          error: {{ t('status.error') | tojson }},
+          processing: {{ t('status.processing') | tojson }},
+          currencyCode: {{ t('common.currencyCode') | tojson }}
+        },
+        notifications: {
+          empty: {{ t('notifications.empty') | tojson }}
+        }
+      };
     </script>
     <script src="{{ url_for('static', filename='js/notifications.js') }}"></script>
     <script src="{{ url_for('static', filename='js/archive.js') }}"></script>

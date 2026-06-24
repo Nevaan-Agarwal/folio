@@ -11,7 +11,8 @@ class UserModel:
     surname: str
     email: str
     passwordHash: str = ""
-    role: str = "employee"
+    role: str = ""
     language: str = "en"
     disabled: bool = False
+    onboardingCompleted: bool = False
     createdAt: datetime = None

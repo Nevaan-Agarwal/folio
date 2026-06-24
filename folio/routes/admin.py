@@ -31,6 +31,11 @@ ALLOWED_CATEGORIES = {
 }
 
 
+def _wants_json_response() -> bool:
+    accepted = (request.headers.get("Accept") or "").lower()
+    return "application/json" in accepted or request.path.startswith("/api")
+
+
 def _to_float(value) -> float:
     try:
         return float(value or 0)
@@ -49,6 +54,23 @@ def _to_iso_date(value: str | None) -> str | None:
         return None
 
 
+def _to_iso_datetime(value) -> str:
+    if not value:
+        return ""
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return str(value)
+
+
+def _to_date_string(value) -> str:
+    if not value:
+        return ""
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    parsed = _to_iso_date(str(value))
+    return parsed or str(value)[:10]
+
+
 def _load_admin_archive_entries() -> list[dict]:
     if database_config.db is None:
         return []
@@ -64,11 +86,13 @@ def _load_admin_archive_entries() -> list[dict]:
         receipt = None
         if payload.get("formId"):
             form = form_repository.get_form(payload["formId"])
-        if payload.get("receiptId"):
-            receipt = receipt_repository.get_receipt(payload["receiptId"])
+        receipt_id = payload.get("receiptId")
+        if receipt_id:
+            receipt = receipt_repository.get_receipt(receipt_id)
         employee = users_by_id.get(user_id)
         form_data = asdict(form) if form else {}
         receipt_data = asdict(receipt) if receipt else {}
+        document_id = payload.get("id", doc.id)
         merchant = payload.get("merchant") or form_data.get("merchant") or receipt_data.get("merchant") or "-"
         amount = _to_float(payload.get("totalAmount") or form_data.get("totalAmount") or receipt_data.get("total"))
         date_value = (
@@ -78,7 +102,7 @@ def _load_admin_archive_entries() -> list[dict]:
         )
         entries.append(
             {
-                "document_id": payload.get("id", doc.id),
+                "document_id": document_id,
                 "user_id": user_id,
                 "employee_name": (
                     f"{employee.firstName} {employee.surname}".strip() if employee else "-"
@@ -92,9 +116,13 @@ def _load_admin_archive_entries() -> list[dict]:
                 "total_amount": amount,
                 "currency": payload.get("currency") or receipt_data.get("currency") or "EUR",
                 "status": receipt_data.get("processingStatus") or payload.get("status") or "processing",
-                "created_at": payload.get("createdAt", ""),
-                "thumbnail": receipt_data.get("imageUrl", ""),
-                "pdf_url": payload.get("downloadUrl", ""),
+                "created_at": _to_iso_datetime(payload.get("createdAt")),
+                "thumbnail": (
+                    url_for("receipts.receipt_image", receipt_id=receipt_id)
+                    if receipt_id
+                    else ""
+                ),
+                "pdf_url": url_for("archive.archive_document_pdf", document_id=document_id),
             }
         )
     return entries
@@ -252,7 +280,22 @@ def _clean_filter_query(filters: dict) -> dict:
 @admin_bp.get("/status")
 @require_admin
 def admin_status():
-    return jsonify({"module": "admin", "status": "ok"})
+    if _wants_json_response():
+        return jsonify({"module": "admin", "status": "ok"})
+
+    users = user_repository.get_all_users("admin")
+    entries = _load_admin_archive_entries()
+    pending_reviews = sum(1 for row in entries if (row.get("status") or "").lower() == "awaiting_review")
+    total_spend = sum(_to_float(row.get("total_amount")) for row in entries)
+    return render_template(
+        "admin/home.html",
+        total_users=len(users),
+        admin_count=sum(1 for user in users if user.role == "admin"),
+        employee_count=sum(1 for user in users if user.role == "employee"),
+        total_documents=len(entries),
+        pending_reviews=pending_reviews,
+        total_spend=total_spend,
+    )
 
 
 @admin_bp.get("/archive")
@@ -472,12 +515,16 @@ def _user_to_view_row(user) -> dict:
                 .stream()
             )
         )
+    display_name = f"{(user.firstName or '').strip()} {(user.surname or '').strip()}".strip()
+    if not display_name:
+        email_prefix = (user.email or "").split("@")[0].strip()
+        display_name = email_prefix or "Unknown User"
     return {
         "id": user.id,
-        "name": f"{user.firstName} {user.surname}".strip(),
-        "email": user.email,
+        "name": display_name,
+        "email": user.email or "-",
         "role": user.role,
-        "joined": user.createdAt.isoformat()[:10] if user.createdAt else "",
+        "joined": _to_date_string(user.createdAt),
         "submissions": submissions_count,
         "disabled": bool(user.disabled),
     }
@@ -537,8 +584,8 @@ def admin_user_detail(user_id: str):
                     "category": payload.get("category", "Other"),
                     "amount": _to_float(payload.get("totalAmount")),
                     "status": payload.get("status", "processing"),
-                    "createdAt": payload.get("createdAt", ""),
-                    "downloadUrl": payload.get("downloadUrl", ""),
+                    "createdAt": _to_iso_datetime(payload.get("createdAt")),
+                    "downloadUrl": url_for("archive.archive_document_pdf", document_id=payload.get("id", doc.id)),
                 }
             )
     submissions.sort(key=lambda item: item.get("createdAt") or "", reverse=True)

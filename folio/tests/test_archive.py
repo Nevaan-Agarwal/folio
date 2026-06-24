@@ -2,12 +2,12 @@ from app import create_app
 from routes import archive as archive_routes
 
 
-def _auth_session(client):
+def _auth_session(client, uid="user-1", role="employee", name="Alice"):
     with client.session_transaction() as flask_session:
-        flask_session["uid"] = "user-1"
-        flask_session["role"] = "employee"
+        flask_session["uid"] = uid
+        flask_session["role"] = role
         flask_session["lang"] = "en"
-        flask_session["name"] = "Alice"
+        flask_session["name"] = name
 
 
 def _records():
@@ -67,6 +67,22 @@ def test_archive_only_returns_current_user_data(monkeypatch):
     assert response.status_code == 200
     payload = response.get_json()
     assert all(item["userId"] == "user-1" for item in payload["results"])
+
+
+def test_admin_archive_data_returns_all_users(monkeypatch):
+    app = create_app("testing")
+    monkeypatch.setattr(
+        archive_routes,
+        "_fetch_archive_page",
+        lambda user_id, cursor=None, page_size=200: (_records(), None, 3),
+    )
+    with app.test_client() as client:
+        _auth_session(client, uid="admin-1", role="admin", name="Admin")
+        response = client.get("/archive/data")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert len(payload["results"]) == 3
+    assert {"user-1", "user-2"} == {item["userId"] for item in payload["results"]}
 
 
 def test_filter_by_merchant_works(monkeypatch):

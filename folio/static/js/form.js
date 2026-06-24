@@ -1,5 +1,6 @@
 (function () {
   const config = window.__folioFormData;
+  const i18n = window.__folioFormI18n || {};
   const form = document.getElementById("reviewForm");
   if (!config || !form) return;
 
@@ -11,7 +12,6 @@
   const confirmRejectBtn = document.getElementById("confirmRejectBtn");
   const cancelRejectBtn = document.getElementById("cancelRejectBtn");
   const savedIndicator = document.getElementById("savedIndicator");
-  const resendEmailBtn = document.getElementById("resendEmailBtn");
   const ocrToggleBtn = document.getElementById("ocrToggleBtn");
   const ocrRawBlock = document.getElementById("ocrRawBlock");
   const summaryTotalDisplay = document.getElementById("summaryTotalDisplay");
@@ -80,13 +80,13 @@
       if (labelLine && missing.has(field) && !labelLine.querySelector(".required-badge")) {
         const badge = document.createElement("span");
         badge.className = "required-badge";
-        badge.textContent = "Required";
+        badge.textContent = i18n.required || "Required";
         labelLine.appendChild(badge);
       }
       if (labelLine && lowConfidenceFields.has(field) && !labelLine.querySelector(".low-confidence-hint")) {
         const hint = document.createElement("span");
         hint.className = "low-confidence-hint";
-        hint.title = "Low confidence — please verify";
+        hint.title = i18n.lowConfidenceHint || "Low confidence — please verify";
         hint.textContent = "ⓘ";
         labelLine.appendChild(hint);
       }
@@ -133,7 +133,7 @@
     if (showToast) {
       savedIndicator.classList.add("visible");
       if (window.showToast) {
-        window.showToast("Draft saved", "info", 2000);
+        window.showToast(i18n.draftSaved || "Draft saved", "info", 2000);
       }
       window.setTimeout(function () {
         savedIndicator.classList.remove("visible");
@@ -143,7 +143,7 @@
 
   ocrToggleBtn?.addEventListener("click", function () {
     ocrRawBlock.hidden = !ocrRawBlock.hidden;
-    ocrToggleBtn.textContent = ocrRawBlock.hidden ? "View extracted text ▾" : "View extracted text ▴";
+    ocrToggleBtn.textContent = ocrRawBlock.hidden ? (i18n.viewExtractedTextDown || "View extracted text ▾") : (i18n.viewExtractedTextUp || "View extracted text ▴");
   });
 
   form.addEventListener("input", function (event) {
@@ -190,17 +190,6 @@
   cancelRejectBtn?.addEventListener("click", function () {
     rejectWrap.classList.remove("show");
     rejectReasonInput.value = "";
-  });
-
-  resendEmailBtn?.addEventListener("click", async function () {
-    if (!config.documentId) return;
-    const response = await fetch("/documents/" + config.documentId + "/resend-email", {
-      method: "POST",
-      headers: { Accept: "application/json" },
-    });
-    if (response.ok) {
-      window.location.reload();
-    }
   });
 
   if (!config.isReadOnly) {

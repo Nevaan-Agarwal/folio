@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}User Management - {{ t('app.name') }}{% endblock %}
-{% block page_title %}User Management{% endblock %}
+{% block title %}{{ t('admin.users.title') }} - {{ t('app.name') }}{% endblock %}
+{% block page_title %}{{ t('admin.users.title') }}{% endblock %}
 
 {% block head_extra %}
 <style>
@@ -13,13 +13,22 @@
   .users-table-wrap { overflow:auto; border:1px solid var(--border-default); border-radius:var(--radius-lg); }
   .users-table { width:100%; border-collapse:collapse; min-width:900px; }
   .users-table th { background:var(--bg-elevated); color:var(--text-secondary); text-transform:uppercase; font-size:11px; letter-spacing:.08em; }
-  .users-table th, .users-table td { border-bottom:1px solid var(--border-default); padding:10px; text-align:left; }
+  .users-table th, .users-table td { border-bottom:1px solid var(--border-default); padding:10px; text-align:left; color:var(--text-primary); }
+  .users-table .cell-name,
+  .users-table .cell-email,
+  .users-table .cell-joined,
+  .users-table .cell-submissions { color:#ffffff !important; font-weight:600; }
   .user-avatar { width:32px; height:32px; border-radius:50%; display:grid; place-items:center; background:var(--bg-elevated); color:var(--accent-primary); font-family:var(--font-mono); font-size:12px; border:1px solid var(--border-default); }
   .role-pill { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; font-size:12px; border:1px solid transparent; }
   .role-admin { color:var(--warning); background:var(--accent-muted); border-color:rgba(245,166,35,.35); }
-  .role-employee { color:var(--text-secondary); background:rgba(138,151,176,.18); border-color:rgba(138,151,176,.32); }
+  .role-employee { color:#10224f; background:#dfe8ff; border-color:#90a9dc; font-weight:600; }
   .actions { display:flex; flex-wrap:wrap; gap:6px; }
   .btn-sm { padding:6px 10px; font-size:12px; }
+  .btn-promote { border:1px solid #ffffff !important; box-shadow: 0 0 0 1px rgba(13,18,64,.15) inset; }
+  .actions .btn-secondary { border-color:#9eb1d9; color:#10224f; }
+  .actions .btn-secondary:hover { border-color:#10224f; background:#eef3ff; }
+  .btn-profile { background:var(--accent-primary); color:#ffffff !important; border-color:#ffffff; }
+  .btn-profile:hover { background:var(--accent-hover); color:#ffffff !important; border-color:#ffffff; }
   .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; place-items:center; z-index:100; }
   .modal-backdrop.show { display:grid; }
   .modal-card { width:min(480px, calc(100vw - 24px)); background:var(--bg-surface); border:1px solid var(--border-default); border-radius:var(--radius-xl); padding:18px; }
@@ -32,59 +41,59 @@
 
 {% block content %}
 <section class="users-stats">
-  <article class="users-stat"><p>Total users</p><h3>{{ total_users }}</h3></article>
-  <article class="users-stat"><p>Admin count</p><h3>{{ admin_count }}</h3></article>
-  <article class="users-stat"><p>Employee count</p><h3>{{ employee_count }}</h3></article>
+  <article class="users-stat"><p>{{ t('admin.users.totalUsers') }}</p><h3>{{ total_users }}</h3></article>
+  <article class="users-stat"><p>{{ t('admin.users.adminCount') }}</p><h3>{{ admin_count }}</h3></article>
+  <article class="users-stat"><p>{{ t('admin.users.employeeCount') }}</p><h3>{{ employee_count }}</h3></article>
 </section>
 
 <form class="users-filter" method="get" action="{{ url_for('admin.admin_users') }}">
-  <input class="input-field" type="text" name="name" placeholder="Search by name" value="{{ filters.name }}" />
-  <input class="input-field" type="text" name="email" placeholder="Search by email" value="{{ filters.email }}" />
+  <input class="input-field" type="text" name="name" placeholder="{{ t('admin.users.searchByName') }}" value="{{ filters.name }}" />
+  <input class="input-field" type="text" name="email" placeholder="{{ t('admin.users.searchByEmail') }}" value="{{ filters.email }}" />
   <select class="input-field" name="role">
-    <option value="">All Roles</option>
-    <option value="admin" {% if filters.role == 'admin' %}selected{% endif %}>Admin</option>
-    <option value="employee" {% if filters.role == 'employee' %}selected{% endif %}>Employee</option>
+    <option value="">{{ t('admin.users.allRoles') }}</option>
+    <option value="admin" {% if filters.role == 'admin' %}selected{% endif %}>{{ t('admin.users.adminRole') }}</option>
+    <option value="employee" {% if filters.role == 'employee' %}selected{% endif %}>{{ t('admin.users.employeeRole') }}</option>
   </select>
-  <button class="btn-primary" type="submit">Apply</button>
+  <button class="btn-primary" type="submit">{{ t('common.apply') }}</button>
 </form>
 
 <div class="users-table-wrap">
   <table class="users-table">
     <thead>
       <tr>
-        <th>Avatar</th><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Submissions</th><th>Actions</th>
+        <th>{{ t('admin.users.avatar') }}</th><th>{{ t('common.name') }}</th><th>{{ t('auth.email') }}</th><th>{{ t('common.role') }}</th><th>{{ t('common.joined') }}</th><th>{{ t('common.submissions') }}</th><th>{{ t('common.actions') }}</th>
       </tr>
     </thead>
     <tbody>
       {% for user in users %}
       <tr>
         <td><span class="user-avatar">{{ (user.name[:1] or 'U')|upper }}</span></td>
-        <td>{{ user.name }}</td>
-        <td>{{ user.email }}</td>
+        <td class="cell-name">{{ user.name or '-' }}</td>
+        <td class="cell-email">{{ user.email or '-' }}</td>
         <td>
           {% if user.role == "admin" %}
-          <span class="role-pill role-admin">★ Admin</span>
+          <span class="role-pill role-admin">★ {{ t('admin.users.adminRole') }}</span>
           {% else %}
-          <span class="role-pill role-employee">Employee</span>
+          <span class="role-pill role-employee">{{ t('admin.users.employeeRole') }}</span>
           {% endif %}
         </td>
-        <td>{{ user.joined or '-' }}</td>
-        <td>{{ user.submissions }}</td>
+        <td class="cell-joined">{{ user.joined or '-' }}</td>
+        <td class="cell-submissions">{{ user.submissions if user.submissions is not none else 0 }}</td>
         <td>
           <div class="actions">
             {% if user.role == "employee" %}
-            <button class="btn-primary btn-sm" type="button" data-action="promote" data-user-id="{{ user.id }}" data-user-name="{{ user.name }}">Promote to Admin</button>
+            <button class="btn-primary btn-sm btn-promote" type="button" data-action="promote" data-user-id="{{ user.id }}" data-user-name="{{ user.name }}">{{ t('admin.users.promoteToAdmin') }}</button>
             {% else %}
-            <button class="btn-danger btn-sm" type="button" data-action="demote" data-user-id="{{ user.id }}" data-user-name="{{ user.name }}" {% if user.id == current_admin_id %}disabled{% endif %}>Demote</button>
+            <button class="btn-danger btn-sm" type="button" data-action="demote" data-user-id="{{ user.id }}" data-user-name="{{ user.name }}" {% if user.id == current_admin_id %}disabled{% endif %}>{{ t('admin.users.demote') }}</button>
             {% endif %}
-            <a class="btn-secondary btn-sm" href="{{ url_for('admin.admin_user_detail', user_id=user.id) }}">View Profile</a>
-            <button class="btn-danger btn-sm" type="button" data-action="deactivate" data-user-id="{{ user.id }}" data-user-name="{{ user.name }}" {% if user.id == current_admin_id %}disabled{% endif %}>Deactivate</button>
+            <a class="btn-secondary btn-sm btn-profile" href="{{ url_for('admin.admin_user_detail', user_id=user.id) }}">{{ t('admin.users.viewProfile') }}</a>
+            <button class="btn-danger btn-sm" type="button" data-action="deactivate" data-user-id="{{ user.id }}" data-user-name="{{ user.name }}" {% if user.id == current_admin_id %}disabled{% endif %}>{{ t('admin.users.deactivate') }}</button>
           </div>
         </td>
       </tr>
       {% endfor %}
       {% if not users %}
-      <tr><td colspan="7" style="text-align:center;color:var(--text-secondary);">No users found.</td></tr>
+      <tr><td colspan="7" style="text-align:center;color:var(--text-secondary);">{{ t('admin.users.noUsersFound') }}</td></tr>
       {% endif %}
     </tbody>
   </table>
@@ -92,11 +101,11 @@
 
 <div id="actionModal" class="modal-backdrop" aria-hidden="true">
   <div class="modal-card">
-    <h3 id="modalTitle">Confirm Action</h3>
+    <h3 id="modalTitle">{{ t('common.confirmAction') }}</h3>
     <p id="modalDescription"></p>
     <div class="modal-actions">
-      <button id="cancelActionBtn" class="btn-secondary" type="button">Cancel</button>
-      <button id="confirmActionBtn" class="btn-primary" type="button">Confirm</button>
+      <button id="cancelActionBtn" class="btn-secondary" type="button">{{ t('common.cancel') }}</button>
+      <button id="confirmActionBtn" class="btn-primary" type="button">{{ t('common.confirm') }}</button>
     </div>
   </div>
 </div>
@@ -105,6 +114,15 @@
 {% block scripts %}
 <script>
   (function () {
+    const i18n = {
+      promoteTitle: {{ t('admin.users.modal.promoteTitle') | tojson }},
+      promoteDesc: {{ t('admin.users.modal.promoteDesc') | tojson }},
+      demoteTitle: {{ t('admin.users.modal.demoteTitle') | tojson }},
+      demoteDesc: {{ t('admin.users.modal.demoteDesc') | tojson }},
+      deactivateTitle: {{ t('admin.users.modal.deactivateTitle') | tojson }},
+      deactivateDesc: {{ t('admin.users.modal.deactivateDesc') | tojson }},
+      fallbackUser: {{ t('common.user') | tojson }}
+    };
     const modal = document.getElementById("actionModal");
     const title = document.getElementById("modalTitle");
     const desc = document.getElementById("modalDescription");
@@ -117,16 +135,16 @@
       pendingAction = action;
       pendingUserId = userId;
       if (action === "promote") {
-        title.textContent = "Promote " + userName + " to Admin?";
-        desc.textContent = "Admin users can access all company data and analytics.";
+        title.textContent = i18n.promoteTitle.replace("{name}", userName);
+        desc.textContent = i18n.promoteDesc;
         confirm.className = "btn-primary";
       } else if (action === "demote") {
-        title.textContent = "Remove Admin access from " + userName + "?";
-        desc.textContent = "This user will lose access to admin features.";
+        title.textContent = i18n.demoteTitle.replace("{name}", userName);
+        desc.textContent = i18n.demoteDesc;
         confirm.className = "btn-danger";
       } else {
-        title.textContent = "Deactivate " + userName + "?";
-        desc.textContent = "Deactivated users cannot log in.";
+        title.textContent = i18n.deactivateTitle.replace("{name}", userName);
+        desc.textContent = i18n.deactivateDesc;
         confirm.className = "btn-danger";
       }
       modal.classList.add("show");
@@ -144,7 +162,7 @@
       btn.addEventListener("click", function () {
         const action = btn.getAttribute("data-action");
         const userId = btn.getAttribute("data-user-id");
-        const userName = btn.getAttribute("data-user-name") || "user";
+        const userName = btn.getAttribute("data-user-name") || i18n.fallbackUser;
         if (!action || !userId) return;
         openModal(action, userId, userName);
       });
