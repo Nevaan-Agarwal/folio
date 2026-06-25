@@ -34,11 +34,11 @@ class OcrService:
             configured_cmd = os.getenv("TESSERACT_CMD", "").strip()
             if configured_cmd:
                 pytesseract.pytesseract.tesseract_cmd = configured_cmd
-        timeout_raw = os.getenv("OCR_PASS_TIMEOUT_SECONDS", "20").strip()
+        timeout_raw = os.getenv("OCR_PASS_TIMEOUT_SECONDS", "35").strip()
         try:
             self.ocr_pass_timeout_seconds = max(5, min(120, int(timeout_raw)))
         except ValueError:
-            self.ocr_pass_timeout_seconds = 20
+            self.ocr_pass_timeout_seconds = 35
         try:
             from utils.image_processor import ImageProcessor
 
@@ -71,13 +71,21 @@ class OcrService:
 
             candidates: list[dict] = []
             pass_errors: list[str] = []
-            for variant in variant_paths:
-                for psm in (4, 6, 11):
+            for variant_index, variant in enumerate(variant_paths):
+                psm_candidates = (6, 11) if variant_index == 0 else (6,)
+                for psm in psm_candidates:
                     result = self._run_ocr_pass(variant, language=language, psm=psm)
                     if result.get("error"):
                         pass_errors.append(str(result["error"]))
                         continue
                     candidates.append(result)
+                    if (
+                        float(result.get("confidence") or 0) >= 70
+                        and len([word for word in (result.get("words") or []) if (word or "").strip()]) >= 12
+                    ):
+                        break
+                if candidates and float(candidates[-1].get("confidence") or 0) >= 70:
+                    break
 
             if not candidates:
                 error_summary = "; ".join(pass_errors[:3]) or "No OCR candidates produced."
@@ -147,11 +155,6 @@ class OcrService:
                 config=custom_config,
                 timeout=self.ocr_pass_timeout_seconds,
             )
-            raw_text = pytesseract.image_to_string(
-                image_path,
-                config=custom_config,
-                timeout=self.ocr_pass_timeout_seconds,
-            ).strip()
         except Exception as exc:
             logger.warning(
                 "OCR pass failed (psm=%s, timeout=%ss, file=%s): %s",
@@ -168,6 +171,7 @@ class OcrService:
                 "low_confidence_words": [],
             }
         words = data.get("text", [])
+        raw_text = " ".join((word or "").strip() for word in words if (word or "").strip()).strip()
         confidences = data.get("conf", [])
 
         valid_confidences: list[float] = []
