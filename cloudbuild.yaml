@@ -1,0 +1,68 @@
+# Build and deploy Folio to Cloud Run in europe-west4.
+#
+# Before running this build, create these Secret Manager secrets:
+# - folio-database-url
+# - folio-flask-secret-key
+# - folio-openai-api-key
+# - folio-resend-api-key
+substitutions:
+  _REGION: europe-west4
+  _SERVICE_NAME: folio
+  _AR_REPOSITORY: folio
+  _CLOUDSQL_INSTANCE: gen-lang-client-0832165764:europe-west3:gen-lang-client-0832165764-instance
+  _OPENAI_MODEL: gpt-5.4
+  _RESEND_FROM_EMAIL: Folio <onboarding@sender.folio.com>
+
+steps:
+  - id: ensure-artifact-registry-repository
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        gcloud artifacts repositories describe "${_AR_REPOSITORY}" \
+          --location="${_REGION}" >/dev/null 2>&1 \
+        || gcloud artifacts repositories create "${_AR_REPOSITORY}" \
+          --repository-format=docker \
+          --location="${_REGION}" \
+          --description="Folio Docker images"
+
+  - id: build-image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_SERVICE_NAME}:$SHORT_SHA
+      - -f
+      - folio/Dockerfile
+      - folio
+
+  - id: push-image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_SERVICE_NAME}:$SHORT_SHA
+
+  - id: deploy-cloud-run
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE_NAME}
+      - --image
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_SERVICE_NAME}:$SHORT_SHA
+      - --region
+      - ${_REGION}
+      - --platform
+      - managed
+      - --allow-unauthenticated
+      - --add-cloudsql-instances
+      - ${_CLOUDSQL_INSTANCE}
+      - --update-env-vars
+      - FLASK_ENV=production,STORAGE_ROOT=/tmp/folio-storage,TESSERACT_CMD=/usr/bin/tesseract,OPENAI_MODEL=${_OPENAI_MODEL},RESEND_FROM_EMAIL=${_RESEND_FROM_EMAIL}
+      - --update-secrets
+      - DATABASE_URL=folio-database-url:latest,FLASK_SECRET_KEY=folio-flask-secret-key:latest,OPENAI_API_KEY=folio-openai-api-key:latest,RESEND_API_KEY=folio-resend-api-key:latest
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_SERVICE_NAME}:$SHORT_SHA
