@@ -34,6 +34,11 @@ class OcrService:
             configured_cmd = os.getenv("TESSERACT_CMD", "").strip()
             if configured_cmd:
                 pytesseract.pytesseract.tesseract_cmd = configured_cmd
+        timeout_raw = os.getenv("OCR_PASS_TIMEOUT_SECONDS", "20").strip()
+        try:
+            self.ocr_pass_timeout_seconds = max(5, min(120, int(timeout_raw)))
+        except ValueError:
+            self.ocr_pass_timeout_seconds = 20
         try:
             from utils.image_processor import ImageProcessor
 
@@ -65,9 +70,18 @@ class OcrService:
             )
 
             candidates: list[dict] = []
+            pass_errors: list[str] = []
             for variant in variant_paths:
                 for psm in (4, 6, 11):
-                    candidates.append(self._run_ocr_pass(variant, language=language, psm=psm))
+                    result = self._run_ocr_pass(variant, language=language, psm=psm)
+                    if result.get("error"):
+                        pass_errors.append(str(result["error"]))
+                        continue
+                    candidates.append(result)
+
+            if not candidates:
+                error_summary = "; ".join(pass_errors[:3]) or "No OCR candidates produced."
+                raise RuntimeError(f"OCR did not produce readable output. {error_summary}")
 
             best_result = max(candidates, key=lambda item: item["confidence"])
             raw_text = best_result["raw_text"]
@@ -126,15 +140,33 @@ class OcrService:
             "-c preserve_interword_spaces=1 "
             "-c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,:-/€$%() "
         )
-        data = pytesseract.image_to_data(
-            image_path,
-            output_type=Output.DICT,
-            config=custom_config,
-        )
-        raw_text = pytesseract.image_to_string(
-            image_path,
-            config=custom_config,
-        ).strip()
+        try:
+            data = pytesseract.image_to_data(
+                image_path,
+                output_type=Output.DICT,
+                config=custom_config,
+                timeout=self.ocr_pass_timeout_seconds,
+            )
+            raw_text = pytesseract.image_to_string(
+                image_path,
+                config=custom_config,
+                timeout=self.ocr_pass_timeout_seconds,
+            ).strip()
+        except Exception as exc:
+            logger.warning(
+                "OCR pass failed (psm=%s, timeout=%ss, file=%s): %s",
+                psm,
+                self.ocr_pass_timeout_seconds,
+                image_path,
+                exc,
+            )
+            return {
+                "error": str(exc),
+                "raw_text": "",
+                "words": [],
+                "confidence": 0.0,
+                "low_confidence_words": [],
+            }
         words = data.get("text", [])
         confidences = data.get("conf", [])
 
