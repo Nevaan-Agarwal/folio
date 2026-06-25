@@ -69,6 +69,13 @@ def _auth_session(client):
         flask_session["lang"] = "en"
         flask_session["name"] = "Alice"
 
+def _admin_session(client):
+    with client.session_transaction() as flask_session:
+        flask_session["uid"] = "admin-1"
+        flask_session["role"] = "admin"
+        flask_session["lang"] = "en"
+        flask_session["name"] = "Admin"
+
 
 def test_form_pre_fills_from_ai_result(monkeypatch):
     app = create_app("testing")
@@ -254,6 +261,22 @@ def test_employee_cannot_approve_other_users_form(monkeypatch):
         )
 
     assert response.status_code == 403
+
+
+def test_admin_can_review_other_users_form(monkeypatch):
+    app = create_app("testing")
+    monkeypatch.setattr(
+        forms_routes.form_repository,
+        "get_form_by_receipt",
+        lambda _rid: _sample_form(userId="other-user"),
+    )
+    monkeypatch.setattr(forms_routes.receipt_repository, "get_receipt", lambda _rid: _sample_receipt(userId="other-user"))
+
+    with app.test_client() as client:
+        _admin_session(client)
+        response = client.get("/forms/receipt/receipt-1/review")
+
+    assert response.status_code == 200
 
 
 def test_approved_form_is_read_only(monkeypatch):

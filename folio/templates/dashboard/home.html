@@ -5,8 +5,8 @@
 
 {% block head_extra %}
 <style>
-  .dash-greeting h2 { margin: 0; font-size: 30px; }
-  .dash-greeting p { margin: 4px 0 18px; color: var(--text-secondary); }
+  .dash-greeting h2 { margin: 0; font-size: 30px; color: #ffffff; }
+  .dash-greeting p { margin: 4px 0 18px; color: #ffffff; }
   .dash-banner {
     background: var(--accent-muted);
     border: 1px solid var(--accent-primary);
@@ -160,6 +160,18 @@
     margin: 0;
     color: var(--accent-primary);
   }
+  .onboard-close {
+    border: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    padding: 0 2px;
+  }
+  .onboard-close:hover {
+    color: var(--text-primary);
+  }
   .onboard-step {
     display: grid;
     grid-template-columns: 120px 1fr;
@@ -204,19 +216,6 @@
   <h2>{{ greeting }}</h2>
   <p>{{ t('dashboard.subtitle') }}</p>
 </section>
-
-{% if pendingReviewCount > 0 %}
-<section class="dash-banner" id="pendingReviewBanner">
-  <div class="dash-banner-left">
-    <span class="warn-icon">!</span>
-    <span>{{ t('dashboard.pendingBannerPrefix') }} {{ pendingReviewCount }} {{ t('dashboard.pendingBannerSuffix') }}</span>
-  </div>
-  <div style="display:flex; align-items:center; gap:10px;">
-    <a class="btn-primary" href="{{ actionRequiredForms[0].link if actionRequiredForms else url_for('archive.employee_archive') }}">{{ t('dashboard.reviewNow') }} →</a>
-    <button class="dismiss-btn" id="dismissPendingBanner" type="button">×</button>
-  </div>
-</section>
-{% endif %}
 
 <section class="dash-stats">
   <article class="dash-stat">
@@ -291,6 +290,7 @@
   <section class="onboard-card" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
     <header class="onboard-head">
       <h3 id="onboardingTitle">{{ t('onboarding.title') }}</h3>
+      <button class="onboard-close" type="button" id="onboardingCloseBtn" aria-label="Close">×</button>
     </header>
     <article class="onboard-step" id="onboardingStepContent">
       <div class="onboard-step-num" id="onboardingStepNum">1</div>
@@ -313,14 +313,6 @@
 {% block scripts %}
 <script>
   (function () {
-    const dismiss = document.getElementById("dismissPendingBanner");
-    const banner = document.getElementById("pendingReviewBanner");
-    if (dismiss && banner) {
-      dismiss.addEventListener("click", function () {
-        banner.style.display = "none";
-      });
-    }
-
     const backdrop = document.getElementById("onboardingBackdrop");
     const stepNum = document.getElementById("onboardingStepNum");
     const stepTitle = document.getElementById("onboardingStepTitle");
@@ -328,6 +320,7 @@
     const progress = document.getElementById("onboardingProgress");
     const backBtn = document.getElementById("onboardingBackBtn");
     const nextBtn = document.getElementById("onboardingNextBtn");
+    const closeBtn = document.getElementById("onboardingCloseBtn");
     if (!backdrop || backdrop.hidden) return;
 
     const steps = [
@@ -372,6 +365,11 @@
         completeOnboarding();
       }
     });
+    if (closeBtn) {
+      closeBtn.addEventListener("click", function () {
+        backdrop.hidden = true;
+      });
+    }
     renderStep();
   })();
 </script>

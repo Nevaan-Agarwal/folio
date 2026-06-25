@@ -91,11 +91,16 @@ def _build_user_dashboard(user_id: str | None) -> dict:
         user_receipts[receipt_id] = payload
 
     form_rows = _all_docs("forms")
-    user_forms = []
-    for _form_id, payload in form_rows:
+    forms_by_receipt: dict[str, dict] = {}
+    for form_id, payload in form_rows:
         if user_id is not None and payload.get("userId") != user_id:
             continue
-        user_forms.append(payload)
+        receipt_id = (payload.get("receiptId") or "").strip()
+        if receipt_id:
+            forms_by_receipt[receipt_id] = {
+                "id": form_id,
+                "merchant": payload.get("merchant") or "-",
+            }
 
     doc_rows = _all_docs("combined_documents")
     user_docs = []
@@ -130,15 +135,15 @@ def _build_user_dashboard(user_id: str | None) -> dict:
         )
 
     action_required = []
-    for payload in user_forms:
-        receipt_id = payload.get("receiptId", "")
-        status = (user_receipts.get(receipt_id, {}).get("processingStatus") or "").lower()
-        if status == "awaiting_review":
+    for receipt_id, receipt_payload in user_receipts.items():
+        status = (receipt_payload.get("processingStatus") or "").lower()
+        form_meta = forms_by_receipt.get(receipt_id)
+        if status == "awaiting_review" and form_meta:
             action_required.append(
                 {
                     "receiptId": receipt_id,
-                    "merchant": payload.get("merchant") or "-",
-                    "link": url_for("forms.review_form_by_receipt", receipt_id=receipt_id),
+                    "merchant": form_meta["merchant"],
+                    "link": url_for("forms.review_form", form_id=form_meta["id"]),
                 }
             )
 

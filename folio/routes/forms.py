@@ -47,17 +47,21 @@ def _to_json_safe_form(form):
 
 def _ensure_form_access(form, *, strict_owner: bool = False) -> bool:
     user_id = g.user.get("uid")
+    is_admin = g.user.get("role") == "admin"
     if not form:
         return False
     if form.userId:
-        return form.userId == user_id
+        if strict_owner:
+            return form.userId == user_id
+        if form.userId == user_id or is_admin:
+            return True
     # Backward compatibility for forms created before userId was persisted.
     receipt = receipt_repository.get_receipt(form.receiptId)
     if receipt is None:
         return False
     if strict_owner:
         return receipt.userId == user_id
-    return receipt.userId == user_id or g.user.get("role") == "admin"
+    return receipt.userId == user_id or is_admin
 
 
 def _sanitize_form_input(payload: dict) -> dict:

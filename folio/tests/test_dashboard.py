@@ -118,7 +118,7 @@ def test_dashboard_hides_onboarding_after_completion(monkeypatch):
     assert 'id="onboardingBackdrop" hidden' in body
 
 
-def test_pending_review_banner_shows_correctly(monkeypatch):
+def test_pending_review_banner_not_rendered(monkeypatch):
     app = create_app("testing")
     monkeypatch.setattr(database_config, "db", _FakeDB(_seed_data()))
     with app.test_client() as client:
@@ -126,8 +126,8 @@ def test_pending_review_banner_shows_correctly(monkeypatch):
         response = client.get("/dashboard")
     body = response.get_data(as_text=True)
     assert response.status_code == 200
-    assert "form(s) awaiting review" in body
-    assert "Review Now" in body
+    assert "form(s) awaiting review" not in body
+    assert "Review Now" not in body
 
 
 def test_recent_submissions_limited_to_5(monkeypatch):

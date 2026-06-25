@@ -67,6 +67,16 @@
       .global-search-item:hover { background: var(--bg-elevated); }
       .global-search-item .meta { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
       .global-search-empty { padding: 11px; color: var(--text-secondary); font-size: 12px; }
+      @media (max-width: 768px) {
+        .global-search-wrap { width: 100%; }
+        .global-search {
+          width: 100%;
+          min-width: 0;
+        }
+        .global-search:focus {
+          width: 100%;
+        }
+      }
     </style>
     {% block head_extra %}{% endblock %}
   </head>
@@ -175,6 +185,24 @@
             <a href="{{ url_for('auth.logout') }}" class="logout-link" data-i18n-key="auth.logout">{{ t('auth.logout') }}</a>
           </div>
         </div>
+        <div class="sidebar-mobile-tools" id="sidebarMobileTools">
+          <div class="language-switcher" role="group" aria-label="{{ t('settings.languagePreference') }}">
+            <button
+              class="lang-pill {% if current_lang() == 'en' %}lang-pill-active{% endif %}"
+              type="button"
+              data-lang="en"
+            >
+              EN
+            </button>
+            <button
+              class="lang-pill {% if current_lang() == 'de' %}lang-pill-active{% endif %}"
+              type="button"
+              data-lang="de"
+            >
+              DE
+            </button>
+          </div>
+        </div>
       </div>
     </aside>
 
@@ -193,7 +221,9 @@
             />
             <div class="global-search-dropdown" id="globalSearchDropdown" hidden></div>
           </div>
-          {% include "components/notifications.html" %}
+          <div id="topbarNotificationMount">
+            {% include "components/notifications.html" %}
+          </div>
           <span class="topbar-user">{{ session.get('name', t('app.tagline')) }}</span>
           <div class="language-switcher" role="group" aria-label="{{ t('settings.languagePreference') }}">
             <button

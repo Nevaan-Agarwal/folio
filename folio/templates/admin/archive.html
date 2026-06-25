@@ -10,9 +10,13 @@
   .admin-filter-card { background:var(--bg-surface); border:1px solid var(--border-default); border-radius:var(--radius-lg); padding:14px; margin-bottom:14px; position:sticky; top:0; z-index:3; }
   .admin-filter-row { display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:10px; }
   .admin-filter-row:last-child { margin-bottom:0; }
-  .admin-filter-actions { display:flex; gap:8px; align-items:center; }
+  .admin-filter-row > * { min-width: 0; }
+  .admin-filter-row .input-field { width: 100%; }
+  .admin-filter-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .admin-filter-actions .btn-secondary,
+  .admin-filter-actions .btn-primary { white-space: nowrap; }
   .admin-clear { background:none; border:0; color:var(--text-secondary); cursor:pointer; }
-  .admin-summary { margin-bottom:10px; color:var(--text-secondary); }
+  .admin-summary { margin-bottom:10px; color:var(--text-secondary); word-break: break-word; }
   .admin-table-wrap { overflow:auto; border:1px solid var(--border-default); border-radius:var(--radius-lg); }
   .admin-table { width:100%; border-collapse:collapse; min-width:1100px; }
   .admin-table th { background:var(--bg-elevated); color:var(--text-secondary); text-transform:uppercase; font-size:11px; letter-spacing:.08em; }
@@ -27,7 +31,9 @@
   .admin-icon-btn:hover { border-color:var(--accent-primary); color:var(--accent-primary); }
   .admin-thumb-fallback { display:inline-flex; width:44px; height:56px; border-radius:8px; border:1px dashed var(--border-default); align-items:center; justify-content:center; color:var(--text-muted); font-size:11px; background:var(--bg-elevated); }
   .admin-pagination { display:flex; justify-content:flex-end; gap:8px; margin-top:10px; }
-  @media (max-width: 900px){ .admin-filter-row { grid-template-columns:1fr 1fr; } }
+  @media (max-width: 900px){
+    .admin-filter-row { grid-template-columns:1fr; }
+  }
 </style>
 {% endblock %}
 
@@ -75,7 +81,6 @@
     </select>
     <div class="admin-filter-actions">
       <a class="btn-secondary" href="{{ export_csv_url }}">{{ t('common.exportCsv') }}</a>
-      <a class="btn-secondary" href="{{ export_xlsx_url }}">{{ t('common.exportXlsx') }}</a>
       <a class="admin-clear" href="{{ url_for('admin.admin_archive') }}">{{ t('common.clearAll') }}</a>
       <button class="btn-primary" type="submit">{{ t('common.apply') }}</button>
     </div>

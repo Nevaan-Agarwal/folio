@@ -10,6 +10,9 @@
   .quick-pill { border:1px solid var(--border-default); border-radius:999px; background:var(--bg-elevated); color:var(--text-secondary); padding:7px 10px; cursor:pointer; font-size:12px; }
   .quick-pill:hover { border-color:var(--accent-primary); color:var(--accent-primary); }
   .analytics-filter-row { display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:10px; }
+  .analytics-filter-row > * { min-width: 0; }
+  .analytics-filter-row .input-field { width: 100%; }
+  #analyticsDownloadBtn { white-space: nowrap; text-align: center; }
   .analytics-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:14px; }
   .kpi-card { background:var(--bg-surface); border:1px solid var(--border-default); border-radius:var(--radius-xl); padding:20px; }
   .kpi-label { margin:0; color:var(--text-secondary); font-size:12px; text-transform:uppercase; letter-spacing:.1em; }
@@ -25,7 +28,12 @@
   .analytics-table th { color:var(--text-secondary); text-transform:uppercase; font-size:11px; letter-spacing:.08em; background:var(--bg-elevated); }
   .analytics-table th, .analytics-table td { border-bottom:1px solid var(--border-default); padding:10px; text-align:left; }
   .analytics-table tr:nth-child(even) td { background:rgba(255,255,255,.02); }
-  @media (max-width: 1000px){ .analytics-kpis{grid-template-columns:1fr 1fr;} .chart-grid{grid-template-columns:1fr;} .chart-card.full{grid-column:auto;} .analytics-filter-row{grid-template-columns:1fr 1fr;} }
+  @media (max-width: 1000px){
+    .analytics-kpis{grid-template-columns:1fr 1fr;}
+    .chart-grid{grid-template-columns:1fr;}
+    .chart-card.full{grid-column:auto;}
+    .analytics-filter-row{grid-template-columns:1fr;}
+  }
 </style>
 {% endblock %}
 
@@ -41,7 +49,7 @@
     <input class="input-field" id="analyticsStartDate" type="date" value="{{ filters.start_date }}" />
     <input class="input-field" id="analyticsEndDate" type="date" value="{{ filters.end_date }}" />
     <button id="analyticsRefreshBtn" class="btn-primary" type="button">{{ t('common.refresh') }}</button>
-    <a id="analyticsDownloadBtn" class="btn-secondary" href="{{ url_for('admin.admin_analytics_export', start_date=filters.start_date, end_date=filters.end_date) }}">{{ t('admin.analytics.downloadReport') }}</a>
+    <a id="analyticsDownloadBtn" class="btn-secondary" href="{{ url_for('admin.admin_analytics_export', start_date=filters.start_date, end_date=filters.end_date) }}">{{ t('common.exportCsv') }}</a>
   </div>
 </section>
 
